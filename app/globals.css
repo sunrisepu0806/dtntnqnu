@@ -7,12 +7,6 @@
   --font-be-vietnam-pro: 'Be Vietnam Pro', sans-serif;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-be-vietnam-pro);
-}
-
 html,
 body,
 * {
@@ -26,7 +20,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Ẩn nút tròn đỏ báo lỗi Next.js ở góc màn hình */
+/* Ẩn overlay báo lỗi Next.js */
 nextjs-portal {
   display: none !important;
 }
