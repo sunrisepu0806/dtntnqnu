@@ -114,11 +114,11 @@ export default function AdminDashboardTongQuan() {
 
       const recDate = parseRecordDate(record.timestamp);
       if (!recDate) {
-        if (filterTime === "all") {
-          map[record.studentId] = (map[record.studentId] || 0) + 1;
-        }
-        return;
+      if ((filterTime as any) === "all") {
+        map[record.studentId] = (map[record.studentId] || 0) + 1;
       }
+      return;
+    }
 
       const rMonth = recDate.getMonth();
       const rYear = recDate.getFullYear();
