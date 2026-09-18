@@ -114,11 +114,8 @@ export default function AdminDashboardTongQuan() {
 
       const recDate = parseRecordDate(record.timestamp);
       if (!recDate) {
-      if ((filterTime as any) === "all") {
-        map[record.studentId] = (map[record.studentId] || 0) + 1;
+        return;
       }
-      return;
-    }
 
       const rMonth = recDate.getMonth();
       const rYear = recDate.getFullYear();
@@ -163,13 +160,12 @@ export default function AdminDashboardTongQuan() {
     }));
   }, [members]);
 
-  // BẢNG XẾP HẠNG AN TOÀN (KHÔNG BỊ ẨN / TRẮNG TRANG)
+  // BẢNG XẾP HẠNG AN TOÀN
   const bxhHienThi = useMemo(() => {
     let list = members.map((m) => {
       const sid = m.studentId.toLowerCase();
       let diem = m.sessions;
 
-      // Nếu có dữ liệu điểm danh theo thời gian cụ thể
       if (attendanceFilteredMap !== null) {
         diem = attendanceFilteredMap[sid] || 0;
       }
@@ -180,7 +176,6 @@ export default function AdminDashboardTongQuan() {
       };
     });
 
-    // Lọc theo Tổ nếu chọn
     if (filterGroup !== "all") {
       list = list.filter((m) => m.group === filterGroup);
     }
@@ -190,7 +185,7 @@ export default function AdminDashboardTongQuan() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 font-sans text-slate-800 select-none space-y-5 pb-28">
-      {/* HEADER TỔNG QUAN (KHÔNG VIÊN THUỐC, KHÔNG PHÍM TẮT) */}
+      {/* HEADER TỔNG QUAN */}
       <div className="bg-white border border-slate-200 rounded-3xl p-5 sm:p-6 shadow-xs">
         <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight uppercase">
           Bảng Điều Hành Đội Thanh Niên Tình Nguyện QNU
@@ -200,7 +195,7 @@ export default function AdminDashboardTongQuan() {
         </p>
       </div>
 
-      {/* 4 CARD CHỈ SỐ PHẲNG (BỎ HOÀN TOÀN CÁC VIÊN THUỐC) */}
+      {/* 4 CARD CHỈ SỐ */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
         <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-xs">
           <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
@@ -255,7 +250,6 @@ export default function AdminDashboardTongQuan() {
 
       {/* KHỐI BIỂU ĐỒ TRÒN VÀ TIẾN ĐỘ */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* BIỂU ĐỒ TRÒN: BAN CHUYÊN MÔN */}
         <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs space-y-3">
           <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-2.5">
             Tỷ Lệ Nhân Sự Ban Chuyên Môn
@@ -336,7 +330,6 @@ export default function AdminDashboardTongQuan() {
           </div>
         </div>
 
-        {/* PHÂN BỔ SĨ SỐ 5 TỔ */}
         <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs space-y-3">
           <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-2.5">
             Phân Bổ Sĩ Số 5 Tổ Tình Nguyện
@@ -366,9 +359,8 @@ export default function AdminDashboardTongQuan() {
         </div>
       </div>
 
-      {/* BẢNG XẾP HẠNG HOẠT ĐỘNG (HOẠT ĐỘNG ỔN ĐỊNH, KHÔNG BỊ ẨN) */}
+      {/* BẢNG XẾP HẠNG HOẠT ĐỘNG */}
       <div className="bg-white border border-slate-200 rounded-3xl shadow-xs overflow-hidden">
-        {/* THANH ĐIỀU KHIỂN BỘ LỌC */}
         <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <div>
             <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
@@ -380,7 +372,6 @@ export default function AdminDashboardTongQuan() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {/* Bộ lọc thời gian */}
             <div className="inline-flex rounded-xl bg-slate-100 p-1 text-xs font-bold">
               <button
                 type="button"
@@ -411,7 +402,6 @@ export default function AdminDashboardTongQuan() {
               </button>
             </div>
 
-            {/* Bộ lọc Tổ */}
             <select
               value={filterGroup}
               onChange={(e) => setFilterGroup(e.target.value)}
@@ -427,7 +417,6 @@ export default function AdminDashboardTongQuan() {
           </div>
         </div>
 
-        {/* BẢNG DỮ LIỆU */}
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse whitespace-nowrap">
             <thead>
