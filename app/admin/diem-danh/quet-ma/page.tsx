@@ -82,6 +82,7 @@ export default function TrangQuetDiemDanh() {
 
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const isStartingRef = useRef<boolean>(false);
+  const isProcessingRef = useRef<boolean>(false);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -98,7 +99,9 @@ export default function TrangQuetDiemDanh() {
   const playBeep = useCallback(() => {
     try {
       if (!audioCtxRef.current) {
-        const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        const AudioContextClass =
+          window.AudioContext ||
+          (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
         audioCtxRef.current = new AudioContextClass();
       }
       const ctx = audioCtxRef.current;
@@ -150,7 +153,9 @@ export default function TrangQuetDiemDanh() {
           fullName: data.name || data.fullName || data.hoTen || "Thành viên",
           studentId: String(data.mssv || data.studentId || d.id).trim(),
           department: Array.isArray(data.ban_id)
-            ? data.ban_id.includes("bantruyenthong") ? "Truyền thông" : "Sự kiện"
+            ? data.ban_id.includes("bantruyenthong")
+              ? "Truyền thông"
+              : "Sự kiện"
             : data.department,
           group: data.to_id,
           specialty: data.mangChuyenMon || data.specialty,
@@ -184,6 +189,9 @@ export default function TrangQuetDiemDanh() {
       unsubUsers();
       unsubActs();
       if (timerRef.current) clearTimeout(timerRef.current);
+      if (audioCtxRef.current && audioCtxRef.current.state !== "closed") {
+        audioCtxRef.current.close().catch(() => {});
+      }
     };
   }, []);
 
@@ -244,106 +252,120 @@ export default function TrangQuetDiemDanh() {
       setAttendanceStatus(null);
       setScanStep("idle");
       setManualId("");
-      setIsScanning(true);
+      isProcessingRef.current = false;
     }, duration);
   }, []);
 
-  const processCheckIn = useCallback(async (member: Member) => {
-    if (!currentActivity) return;
-    setLoading(true);
-    const cleanSid = member.studentId.trim().toLowerCase();
+  const processCheckIn = useCallback(
+    async (member: Member) => {
+      if (!currentActivity) {
+        isProcessingRef.current = false;
+        return;
+      }
+      setLoading(true);
+      const cleanSid = member.studentId.trim().toLowerCase();
 
-    try {
-      await addDoc(collection(db, "attendance"), {
-        activityId: currentActivity.id,
-        activityName: currentActivity.name,
-        memberId: member.id,
-        memberName: member.fullName,
-        studentId: member.studentId,
-        scannerName: currentUser.name,
-        scannerMssv: currentUser.mssv,
-        timestamp: serverTimestamp(),
-      });
+      try {
+        await addDoc(collection(db, "attendance"), {
+          activityId: currentActivity.id,
+          activityName: currentActivity.name,
+          memberId: member.id,
+          memberName: member.fullName,
+          studentId: member.studentId,
+          scannerName: currentUser.name,
+          scannerMssv: currentUser.mssv,
+          timestamp: serverTimestamp(),
+        });
 
-      const userDocRef = doc(db, "users", cleanSid);
-      await updateDoc(userDocRef, {
-        soBuoiDiemDanh: increment(1),
-      }).catch(async () => {
-        await updateDoc(doc(db, "users", member.id), {
+        const userDocRef = doc(db, "users", cleanSid);
+        await updateDoc(userDocRef, {
           soBuoiDiemDanh: increment(1),
-        }).catch(() => {});
-      });
+        }).catch(async () => {
+          await updateDoc(doc(db, "users", member.id), {
+            soBuoiDiemDanh: increment(1),
+          }).catch(() => {});
+        });
 
-      playBeep();
-      setCheckedInSet((prev) => new Set(prev).add(cleanSid));
-      setAttendanceStatus({
-        status: "success",
-        member,
-        scannerInfo: `${currentUser.name} (${currentUser.mssv})`,
-        msg: "Điểm danh thành công",
-      });
-    } catch {
-      setAttendanceStatus({ status: "error", msg: "Lỗi kết nối khi lưu bản ghi điểm danh" });
-    } finally {
-      setLoading(false);
-      setScanStep("result");
-      resetAfterDelay(1600);
-    }
-  }, [currentActivity, currentUser, playBeep, resetAfterDelay]);
-
-  const initiateVerification = useCallback((inputData: string) => {
-    const cleanInput = inputData.trim().toLowerCase();
-    const member = membersMap.get(cleanInput);
-
-    if (member) {
-      if (checkedInSet.has(member.studentId.toLowerCase())) {
+        playBeep();
+        setCheckedInSet((prev) => new Set(prev).add(cleanSid));
         setAttendanceStatus({
-          status: "warning",
+          status: "success",
           member,
-          msg: "Chiến sĩ này đã quét điểm danh trước đó!",
+          scannerInfo: `${currentUser.name} (${currentUser.mssv})`,
+          msg: "Điểm danh thành công",
+        });
+      } catch {
+        setAttendanceStatus({ status: "error", msg: "Lỗi kết nối khi lưu bản ghi điểm danh" });
+      } finally {
+        setLoading(false);
+        setScanStep("result");
+        resetAfterDelay(1600);
+      }
+    },
+    [currentActivity, currentUser, playBeep, resetAfterDelay]
+  );
+
+  const initiateVerification = useCallback(
+    (inputData: string) => {
+      const cleanInput = inputData.trim().toLowerCase();
+      const member = membersMap.get(cleanInput);
+
+      if (member) {
+        if (checkedInSet.has(member.studentId.toLowerCase())) {
+          setAttendanceStatus({
+            status: "warning",
+            member,
+            msg: "Chiến sĩ này đã quét điểm danh trước đó!",
+          });
+          setScanStep("result");
+          resetAfterDelay(2000);
+        } else {
+          processCheckIn(member);
+        }
+      } else {
+        setAttendanceStatus({
+          status: "error",
+          msg: `Không tìm thấy thông tin: ${inputData}`,
         });
         setScanStep("result");
         resetAfterDelay(2000);
-      } else {
-        processCheckIn(member);
       }
-    } else {
-      setAttendanceStatus({
-        status: "error",
-        msg: `Không tìm thấy thông tin: ${inputData}`,
-      });
-      setScanStep("result");
-      resetAfterDelay(2000);
-    }
-  }, [membersMap, checkedInSet, processCheckIn, resetAfterDelay]);
+    },
+    [membersMap, checkedInSet, processCheckIn, resetAfterDelay]
+  );
 
-  const onScanSuccess = useCallback(async (decodedText: string) => {
-    await stopCamera();
-    initiateVerification(decodedText);
-  }, [stopCamera, initiateVerification]);
+  const onScanSuccess = useCallback(
+    (decodedText: string) => {
+      if (isProcessingRef.current) return;
+      isProcessingRef.current = true;
+      initiateVerification(decodedText);
+    },
+    [initiateVerification]
+  );
 
   const startCamera = useCallback(async () => {
     if (isStartingRef.current || (scannerRef.current && scannerRef.current.isScanning)) return;
 
     isStartingRef.current = true;
-    setIsScanning(true);
 
     try {
       if (scannerRef.current) {
         await stopCamera();
       }
 
-      await new Promise((res) => setTimeout(res, 200));
+      await new Promise((res) => setTimeout(res, 150));
 
       const scanner = new Html5Qrcode("reader");
       scannerRef.current = scanner;
 
+      // fps: 10 giúp CPU tối ưu hiệu năng quét, tránh drop giật khung hình
       await scanner.start(
         { facingMode: "environment" },
-        { fps: 20, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
+        { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
         onScanSuccess,
         () => {}
       );
+      setIsScanning(true);
     } catch (err) {
       console.error("Camera Start Error:", err);
       setIsScanning(false);
@@ -353,7 +375,7 @@ export default function TrangQuetDiemDanh() {
   }, [onScanSuccess, stopCamera]);
 
   useEffect(() => {
-    if (currentActivity && isScanning && scanStep === "idle" && !showManualInput) {
+    if (currentActivity && isScanning && !showManualInput) {
       startCamera();
     }
     return () => {
@@ -361,7 +383,7 @@ export default function TrangQuetDiemDanh() {
         scannerRef.current.stop().catch(() => {});
       }
     };
-  }, [currentActivity, isScanning, scanStep, showManualInput, startCamera]);
+  }, [currentActivity, isScanning, showManualInput, startCamera]);
 
   const handleActivityLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -380,6 +402,7 @@ export default function TrangQuetDiemDanh() {
   };
 
   const handleCloseSession = async () => {
+    isProcessingRef.current = false;
     await stopCamera();
     setCurrentActivity(null);
     setPasswordInput("");
@@ -389,7 +412,10 @@ export default function TrangQuetDiemDanh() {
   };
 
   const processBulkCheckIn = async (ids: string[]) => {
-    if (!currentActivity) return;
+    if (!currentActivity) {
+      isProcessingRef.current = false;
+      return;
+    }
     setLoading(true);
 
     let success = 0;
@@ -460,6 +486,7 @@ export default function TrangQuetDiemDanh() {
     e.preventDefault();
     if (!manualId.trim()) return;
     setShowManualInput(false);
+    isProcessingRef.current = true;
 
     const ids = manualId.split(/[\n, ]+/).map((id) => id.trim()).filter(Boolean);
     if (ids.length === 1) {
@@ -494,7 +521,7 @@ export default function TrangQuetDiemDanh() {
           </div>
 
           {errorMessage && (
-            <div className="mb-4 bg-rose-50 border border-rose-200 text-rose-600 text-xs font-semibold p-3 rounded-xl text-center animate-shake">
+            <div className="mb-4 bg-rose-50 border border-rose-200 text-rose-600 text-xs font-semibold p-3 rounded-xl text-center">
               {errorMessage}
             </div>
           )}
@@ -604,11 +631,30 @@ export default function TrangQuetDiemDanh() {
           <div className="lg:col-span-7 flex flex-col gap-3">
             <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm min-h-[380px] flex flex-col justify-center items-center relative overflow-hidden">
               
-              {/* TRẠNG THÁI KẾT QUẢ */}
+              {/* CAMERA GIỮ CỐ ĐỊNH TRONG DOM */}
+              <div
+                id="reader"
+                className={`w-full max-w-[320px] aspect-square rounded-2xl overflow-hidden border border-slate-200 bg-black shadow-inner ${
+                  !isScanning ? "hidden" : "block"
+                }`}
+              />
+
+              {!isScanning && (
+                <div className="text-center py-16">
+                  <div className="w-12 h-12 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-2 text-lg">
+                    📷
+                  </div>
+                  <p className="text-slate-400 font-semibold uppercase text-xs tracking-wider">
+                    Camera đang tạm ngắt
+                  </p>
+                </div>
+              )}
+
+              {/* LỚP PHỦ THÔNG BÁO KẾT QUẢ QUÉT (DÙNG BG-WHITE THAY CHO BLUR GIÚP GPU NHẸ TẢI) */}
               {scanStep === "result" && attendanceStatus && (
-                <div className="text-center p-4 w-full animate-fade-in">
+                <div className="absolute inset-0 bg-white flex flex-col items-center justify-center p-6 z-20">
                   {attendanceStatus.status === "success" ? (
-                    <div>
+                    <div className="text-center">
                       <div className="w-16 h-16 bg-emerald-50 text-emerald-600 font-black text-2xl rounded-2xl flex items-center justify-center mx-auto mb-3 border border-emerald-200 shadow-sm">
                         ✓
                       </div>
@@ -623,7 +669,7 @@ export default function TrangQuetDiemDanh() {
                       </div>
                     </div>
                   ) : attendanceStatus.status === "warning" ? (
-                    <div>
+                    <div className="text-center">
                       <div className="w-16 h-16 bg-amber-50 text-amber-600 font-black text-2xl rounded-2xl flex items-center justify-center mx-auto mb-3 border border-amber-200 shadow-sm">
                         !
                       </div>
@@ -635,35 +681,13 @@ export default function TrangQuetDiemDanh() {
                       </span>
                     </div>
                   ) : (
-                    <div>
+                    <div className="text-center">
                       <div className="w-16 h-16 bg-rose-50 text-rose-600 font-black text-2xl rounded-2xl flex items-center justify-center mx-auto mb-3 border border-rose-200 shadow-sm">
                         ✕
                       </div>
                       <h3 className="text-sm font-bold text-rose-600 px-2 mt-1">{attendanceStatus.msg}</h3>
                     </div>
                   )}
-                </div>
-              )}
-
-              {/* CAMERA IDLE */}
-              {scanStep === "idle" && (
-                <div className="w-full flex flex-col items-center justify-center">
-                  {!isScanning && (
-                    <div className="text-center py-16">
-                      <div className="w-12 h-12 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-2 text-lg">
-                        📷
-                      </div>
-                      <p className="text-slate-400 font-semibold uppercase text-xs tracking-wider">
-                        Camera đang tạm ngắt
-                      </p>
-                    </div>
-                  )}
-                  <div
-                    id="reader"
-                    className={`w-full max-w-[320px] aspect-square ${
-                      !isScanning ? "hidden" : "block rounded-2xl overflow-hidden border border-slate-200 bg-black shadow-inner"
-                    }`}
-                  />
                 </div>
               )}
             </div>
@@ -673,9 +697,11 @@ export default function TrangQuetDiemDanh() {
               <button
                 type="button"
                 onClick={() => {
-                  setScanStep("idle");
-                  if (isScanning) stopCamera();
-                  else startCamera();
+                  if (isScanning) {
+                    stopCamera();
+                  } else {
+                    setIsScanning(true);
+                  }
                 }}
                 disabled={scanStep !== "idle" || showManualInput}
                 className={`py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition cursor-pointer active:scale-[0.98] ${
@@ -688,10 +714,7 @@ export default function TrangQuetDiemDanh() {
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  stopCamera();
-                  setShowManualInput(true);
-                }}
+                onClick={() => setShowManualInput(true)}
                 disabled={scanStep !== "idle"}
                 className="bg-white text-slate-700 py-3 rounded-xl font-bold text-xs uppercase tracking-wider border border-slate-200 hover:bg-slate-50 transition cursor-pointer active:scale-[0.98]"
               >
@@ -757,7 +780,7 @@ export default function TrangQuetDiemDanh() {
       {/* POPUP NHẬP MÃ THỦ CÔNG */}
       {showManualInput && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-sm p-6 rounded-3xl shadow-xl border border-slate-200 text-center animate-scale-up">
+          <div className="bg-white w-full max-w-sm p-6 rounded-3xl shadow-xl border border-slate-200 text-center">
             <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight mb-1">
               Nhập Mã Sinh Viên
             </h3>
