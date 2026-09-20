@@ -26,7 +26,7 @@ export interface ActivityPostItem {
   danhSachAnhPhu: string[];
 }
 
-export function parseBBCode(text: string) {
+function parseBBCode(text: string) {
   if (!text) return '';
   return text
     .replace(/\[b\](.*?)\[\/b\]/gi, '<strong class="font-extrabold text-slate-900">$1</strong>')
