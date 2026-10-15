@@ -1,0 +1,7 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "buildCommand": "node website/scripts/build.mjs",
+  "outputDirectory": "website/dist",
+  "installCommand": "node -e \"console.log('No dependencies needed for QNU website')\""
+}

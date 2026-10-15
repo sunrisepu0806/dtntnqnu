@@ -1,0 +1,9 @@
+{
+  "editor.wordWrap": "on",
+  "editor.tabSize": 2,
+  "files.encoding": "utf8",
+  "files.exclude": { "dist": true, "node_modules": true },
+  "search.exclude": { "dist": true },
+  "workbench.startupEditor": "readme",
+  "html.format.wrapLineLength": 100
+}

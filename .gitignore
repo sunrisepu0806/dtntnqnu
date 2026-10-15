@@ -39,3 +39,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Website quảng bá: bản sinh tự động, không sửa tay.
+/website/dist/
+/website/.env*
+/website/node_modules/

@@ -1,0 +1,7 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    { "label": "QNU: Xem thử website", "type": "shell", "command": "node scripts/dev.mjs", "isBackground": true, "problemMatcher": [] },
+    { "label": "QNU: Kiểm tra trước khi đăng", "type": "shell", "command": "node scripts/build.mjs", "group": { "kind": "build", "isDefault": true }, "problemMatcher": [] }
+  ]
+}
