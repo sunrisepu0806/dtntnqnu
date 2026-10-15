@@ -11,7 +11,7 @@ Mở `DTNTNQNU.code-workspace` ở thư mục bên ngoài bằng VS Code. Cửa 
 | Ngày thành lập, giới thiệu chung | `noi-dung/02-gioi-thieu-doi.html` |
 | Câu chuyện, lịch sử, liên kết Beacons | `noi-dung/02a-cau-chuyen-doi.html` |
 | Ban Truyền thông và Ban Sự kiện | `noi-dung/02b-cac-ban.html` |
-| Sáu hoạt động và ảnh đại diện | `noi-dung/03-hoat-dong.html` |
+| Các hoạt động và ảnh đại diện | `noi-dung/03-hoat-dong.html` |
 | Lời quảng bá, mời đồng hành | `noi-dung/04-loi-moi-dong-hanh.html` |
 | Tiêu đề và bộ lọc danh mục Facebook | `noi-dung/05-bai-facebook.html` |
 | Email, fanpage, thông báo chờ phỏng vấn | `noi-dung/06-lien-he-phong-van.html` |
@@ -65,15 +65,11 @@ Cấu hình Vercel nằm ở `../vercel.json`. Các thư mục khác ở cấp c
 
 Mã nguồn cũ được giữ ở nhánh `backup/truoc-web-quang-ba` và commit `e54261610c3c5ce9aa331129a7b579d9fba78094`.
 
-## Hai trang hoạt động riêng
-- `noi-dung/trang-hoat-dong/trung-thu-cho-em.html`: ảnh, câu chuyện và lời mời Trung thu.
-- `noi-dung/trang-hoat-dong/xuan-yeu-thuong.html`: ảnh, câu chuyện và lời mời Xuân.
-- `giao-dien/campaign.css`: bố cục hai trang.
-- Số 2.523 lượt ủng hộ trước đây do Đội cung cấp nằm trong `noi-dung/01-dau-trang.html`, tách khỏi bộ đếm Quan tâm trực tiếp để tránh cộng trùng.
-
 ## Ba hoạt động nằm ngay trên trang chủ
 - `noi-dung/03-hoat-dong.html`: lời dẫn, nút chuyển nhanh và các hoạt động khác.
 - `noi-dung/03a-mua-he-xanh.html`: toàn bộ ảnh, câu chuyện, lời mời Mùa hè xanh.
 - `noi-dung/03b-trung-thu-cho-em.html`: Trung thu cho em.
 - `noi-dung/03c-xuan-yeu-thuong.html`: Xuân yêu thương.
 Ba tệp trên được ghép vào trang chủ khi build. Các địa chỉ trang riêng cũ chỉ chuyển về đúng phần trên trang chủ. Giao diện hiện tại sửa ở cuối `giao-dien/styles.css`, mục BA HOẠT ĐỘNG TRÊN TRANG CHỦ.
+
+Số 2.523 lượt ủng hộ trước đây do Đội cung cấp sửa ở `noi-dung/01-dau-trang.html`, tách khỏi bộ đếm trực tiếp.
