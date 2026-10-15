@@ -7,7 +7,9 @@ export function createStore(env = process.env, request = fetch) {
   const key = env.NEXT_PUBLIC_FIREBASE_API_KEY;
   if (!project || !key) throw new Error('Missing Firebase configuration');
   const base = `projects/${project}/databases/(default)/documents`;
-  const counter = `${base}/qnu_website_counters/interest`;
+  // Preview có dữ liệu riêng, không cộng lượt thử vào website chính thức.
+  const collection = env.VERCEL_ENV === 'preview' ? 'qnu_website_preview_counters' : 'qnu_website_counters';
+  const counter = `${base}/${collection}/interest`;
   const marker = id => `${counter}/visitors/${createHash('sha256').update(id).digest('hex')}`;
   async function call(path, options = {}) {
     const response = await request(`https://firestore.googleapis.com/v1/${path}?key=${encodeURIComponent(key)}`, {

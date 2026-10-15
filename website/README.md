@@ -51,7 +51,7 @@ Cấu hình Vercel nằm ở `../vercel.json`. Các thư mục khác ở cấp c
 ## Bộ đếm Quan tâm
 
 - Mã trình duyệt: `chuc-nang/interest.js`. API Vercel: `../api/interest.js`, xử lý tại `server/interest.mjs`.
-- Dùng Firebase của dự án qua các biến môi trường đã có trên Vercel. Collection riêng: `qnu_website_counters`.
+- Dùng Firebase của dự án qua các biến môi trường đã có trên Vercel. Collection riêng: `qnu_website_counters`; lượt thử preview nằm riêng trong `qnu_website_preview_counters`.
 - Một thao tác nguyên tử vừa ghi dấu lượt quan tâm, vừa cộng bộ đếm. Nhấn lặp cùng trình duyệt không cộng hai lần.
 - Dữ liệu D1 của bản Sites cũ không tự chuyển sang Firebase. Bản này đếm riêng từ khi chuyển hosting.
 - Không dùng số giả hoặc localStorage thay cho số chung. Nếu thiếu cấu hình/quyền Firebase, trang hiển thị lỗi kết nối.
