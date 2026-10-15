@@ -64,3 +64,9 @@ Cấu hình Vercel nằm ở `../vercel.json`. Các thư mục khác ở cấp c
 `scripts/build.mjs`: ghép các phần nội dung. `scripts/dev.mjs`: máy chủ xem thử.
 
 Mã nguồn cũ được giữ ở nhánh `backup/truoc-web-quang-ba` và commit `e54261610c3c5ce9aa331129a7b579d9fba78094`.
+
+## Hai trang hoạt động riêng
+- `noi-dung/trang-hoat-dong/trung-thu-cho-em.html`: ảnh, câu chuyện và lời mời Trung thu.
+- `noi-dung/trang-hoat-dong/xuan-yeu-thuong.html`: ảnh, câu chuyện và lời mời Xuân.
+- `giao-dien/campaign.css`: bố cục hai trang.
+- Số 2.523 lượt ủng hộ trước đây do Đội cung cấp nằm trong `noi-dung/01-dau-trang.html`, tách khỏi bộ đếm Quan tâm trực tiếp để tránh cộng trùng.

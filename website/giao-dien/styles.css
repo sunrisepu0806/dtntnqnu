@@ -140,3 +140,6 @@ footer.section { padding-top:35px; padding-bottom:25px; background:var(--pale); 
 .team-source-links { display:flex; flex-wrap:wrap; gap:16px 28px; border-top:1px solid var(--line); padding-top:22px; margin-top:25px; }
 .team-source-links a { font-size:11px; }
 @media(max-width:760px) { .team-story { padding:24px; }.team-story-grid { grid-template-columns:1fr; gap:22px; }.team-story>h3 { font-size:24px; } }
+
+/* Hai trang hoạt động và số liệu ủng hộ trước đây. */
+.past-support{margin-top:28px;padding:18px 20px;border-radius:14px;background:#eaf3ff;color:var(--blue-dark);font-size:13px}.past-support strong{font-size:30px;margin-right:5px}.past-support small{display:block;font-size:11px;line-height:1.7;color:var(--muted)}.season-feature{display:grid;grid-template-columns:1fr 1fr;gap:32px;align-items:center;margin-top:32px;padding:25px;background:white;border-radius:16px}.season-feature img{width:100%;height:auto;border-radius:12px}.season-feature h3{margin-bottom:15px}.season-feature p{font-size:14px}@media(max-width:700px){.season-feature{grid-template-columns:1fr;padding:20px}}

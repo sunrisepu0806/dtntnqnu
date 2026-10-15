@@ -18,6 +18,7 @@ export function build() {
   const html = expand(template);
   const output = join(root, 'dist');
   copy(join(root, 'public'), output);
+  copy(join(root, 'noi-dung/trang-hoat-dong'), output);
   copy(join(root, 'giao-dien'), output);
   copy(join(root, 'chuc-nang'), output);
   copyFileSync(join(root, 'du-lieu/bai-facebook.js'), join(output, 'posts-data.js'));
