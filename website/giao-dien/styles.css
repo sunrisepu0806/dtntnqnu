@@ -171,3 +171,19 @@ footer.section { padding-top:35px; padding-bottom:25px; background:var(--pale); 
 .other-activities { margin:60px 0 35px; }.other-activities>h3 { margin-bottom:18px; }
 @media(max-width:760px) { .program-story { padding:24px; border-radius:18px; }.program-lead { grid-template-columns:1fr; gap:26px; }.program-headline { font-size:31px; }.program-contribute { padding:22px; }.program-roles { grid-template-columns:1fr; gap:22px; }.program-photos { gap:18px; }.program-story h4 { font-size:22px; } }
 @media(max-width:480px) { .program-story { padding:20px; }.program-photos { grid-template-columns:1fr; }.program-jumps { gap:8px; }.program-jumps a { font-size:12px; padding:10px 14px; }.program-headline { font-size:29px; } }
+
+/* Ba tab hoạt động và bộ xem ảnh; nội dung vẫn đọc được khi JavaScript tắt. */
+.program-story[hidden] { display:none; }
+.program-jumps[role=tablist] { position:sticky; top:var(--header-height,88px); z-index:10; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; padding:10px; background:#f0f6fdf5; border:1px solid var(--line); border-radius:16px; backdrop-filter:blur(12px); }
+.program-jumps [role=tab] { display:flex; align-items:center; justify-content:center; min-height:48px; padding:12px 10px; text-align:center; border-radius:10px; line-height:1.45; }
+.program-jumps [aria-selected=true] { background:var(--blue); color:white; border-color:var(--blue); box-shadow:0 4px 12px #1260cf22; }
+.program-story,.program-contribute { scroll-margin-top:calc(var(--header-height,88px) + 100px); }
+.gallery-help { margin:28px 0 16px; font-size:12px; color:var(--blue-dark); }
+.photo-open { display:block; width:100%; padding:0; background:#eaf1f8; border:0; border-radius:14px; overflow:hidden; cursor:zoom-in; }
+.program-photos { align-items:start; }.program-photos img { aspect-ratio:auto; height:auto; object-fit:contain; }
+.photo-viewer { width:min(1000px,96vw); max-height:94dvh; padding:16px; border:1px solid var(--line); border-radius:18px; color:var(--ink); background:white; }
+.photo-viewer::backdrop { background:#091b35dc; }.photo-viewer img { width:100%; max-height:66dvh; object-fit:contain; background:#edf3fa; border-radius:10px; }
+.photo-toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
+.photo-viewer button { border:1px solid #c4d7ef; border-radius:10px; padding:10px 16px; min-height:44px; background:white; color:var(--blue-dark); }
+.photo-viewer button:disabled { opacity:.45; cursor:default; }.photo-controls { display:flex; justify-content:space-between; gap:12px; }.photo-caption { font-size:13px; margin:12px 0; }.photo-position { margin:0; font-size:13px; }
+@media(max-width:760px) { .program-jumps[role=tablist] { margin-left:-10px; margin-right:-10px; padding:6px; gap:5px; }.program-jumps [role=tab] { font-size:12px; padding:10px 5px; }.program-lead>figure { order:-1; }.program-photos { grid-template-columns:1fr; gap:24px; }.program-story { padding:18px; }.program-contribute { padding:18px; }.photo-viewer { padding:12px; }.program-story figcaption { font-size:12px; }.program-narrative { margin-top:28px; } }

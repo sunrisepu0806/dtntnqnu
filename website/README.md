@@ -73,3 +73,6 @@ Mã nguồn cũ được giữ ở nhánh `backup/truoc-web-quang-ba` và commit
 Ba tệp trên được ghép vào trang chủ khi build. Các địa chỉ trang riêng cũ chỉ chuyển về đúng phần trên trang chủ. Giao diện hiện tại sửa ở cuối `giao-dien/styles.css`, mục BA HOẠT ĐỘNG TRÊN TRANG CHỦ.
 
 Số 2.523 lượt ủng hộ trước đây do Đội cung cấp sửa ở `noi-dung/01-dau-trang.html`, tách khỏi bộ đếm trực tiếp.
+
+## Tab và bộ xem ảnh
+`chuc-nang/programs.js` điều khiển 3 tab và bộ xem ảnh phóng lớn (Đóng, Ảnh trước, Ảnh sau). Mỗi hoạt động có 5 ảnh. Đổi ảnh trong tệp nội dung của hoạt động; không cần sửa JavaScript. Trên điện thoại bộ ảnh xếp một cột và giữ nguyên tỷ lệ.
