@@ -70,3 +70,10 @@ Mã nguồn cũ được giữ ở nhánh `backup/truoc-web-quang-ba` và commit
 - `noi-dung/trang-hoat-dong/xuan-yeu-thuong.html`: ảnh, câu chuyện và lời mời Xuân.
 - `giao-dien/campaign.css`: bố cục hai trang.
 - Số 2.523 lượt ủng hộ trước đây do Đội cung cấp nằm trong `noi-dung/01-dau-trang.html`, tách khỏi bộ đếm Quan tâm trực tiếp để tránh cộng trùng.
+
+## Ba hoạt động nằm ngay trên trang chủ
+- `noi-dung/03-hoat-dong.html`: lời dẫn, nút chuyển nhanh và các hoạt động khác.
+- `noi-dung/03a-mua-he-xanh.html`: toàn bộ ảnh, câu chuyện, lời mời Mùa hè xanh.
+- `noi-dung/03b-trung-thu-cho-em.html`: Trung thu cho em.
+- `noi-dung/03c-xuan-yeu-thuong.html`: Xuân yêu thương.
+Ba tệp trên được ghép vào trang chủ khi build. Các địa chỉ trang riêng cũ chỉ chuyển về đúng phần trên trang chủ. Giao diện hiện tại sửa ở cuối `giao-dien/styles.css`, mục BA HOẠT ĐỘNG TRÊN TRANG CHỦ.
