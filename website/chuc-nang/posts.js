@@ -29,11 +29,11 @@
    const date=document.createElement('time');date.dateTime=post.date;date.textContent=post.date.split('-').reverse().join('.');meta.append(tag,date);
    const title=document.createElement('h3');title.textContent=post.title;
    const actions=document.createElement('div');actions.className='post-actions';
-   const toggle=document.createElement('button');toggle.type='button';toggle.className='post-toggle';toggle.textContent=post.video?'Xem video Facebook ▷':'Xem bài Facebook ↓';toggle.setAttribute('aria-expanded','false');
-   const source=document.createElement('a');source.className='post-source';source.href=post.url;source.target='_blank';source.rel='noopener noreferrer';source.textContent='Mở bài gốc ↗';
+   const toggle=document.createElement('button');toggle.type='button';toggle.className='post-toggle';toggle.textContent=post.video?'Xem video Facebook':'Xem bài Facebook';toggle.setAttribute('aria-expanded','false');
+   const source=document.createElement('a');source.className='post-source';source.href=post.url;source.target='_blank';source.rel='noopener noreferrer';source.textContent='Mở bài gốc';
    const embed=document.createElement('div');embed.className='post-embed';embed.hidden=true;embed.id='embed-'+posts.indexOf(post);toggle.setAttribute('aria-controls',embed.id);
    toggle.addEventListener('click',()=>{
-    const opening=embed.hidden;embed.hidden=!opening;toggle.setAttribute('aria-expanded',String(opening));toggle.textContent=opening?'Thu gọn ↑':(post.video?'Xem video Facebook ▷':'Xem bài Facebook ↓');
+    const opening=embed.hidden;embed.hidden=!opening;toggle.setAttribute('aria-expanded',String(opening));toggle.textContent=opening?'Thu gọn':(post.video?'Xem video Facebook':'Xem bài Facebook');
     if(opening&&!embed.childElementCount){
      const width=Math.max(350,Math.min(500,Math.floor(embed.clientWidth-24)));
      const frameBox=document.createElement('div');frameBox.className='post-frame';
