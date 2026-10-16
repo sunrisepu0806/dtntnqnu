@@ -81,3 +81,6 @@ Số 2.523 lượt ủng hộ trước đây do Đội cung cấp sửa ở `noi
 - Sửa màu nền, đường phân chia và khoảng cách trong giao-dien/sections.css.
 - Vuốt ngang trên ảnh mở lớn để chuyển ảnh; chuc-nang/swipe.js bỏ qua chạm nhẹ, cuộn dọc và nhiều ngón.
 
+
+## Cỡ chữ và khoảng cách
+Sửa tại `giao-dien/readability.css`: chữ nội dung 16px, chú thích 14px, nhãn 13px; khoảng cách và bố cục cho điện thoại nằm cuối tệp. Tệp này được tải sau các CSS khác.

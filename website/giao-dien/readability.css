@@ -1,0 +1,100 @@
+/* CỠ CHỮ VÀ KHOẢNG CÁCH — chỉnh tại đây, áp dụng sau các tệp giao diện khác. */
+body { font-size:16px; line-height:1.75; }
+h1,h2,h3 { line-height:1.3; letter-spacing:-.025em; text-wrap:balance; }
+p,dd,figcaption { overflow-wrap:break-word; }
+.section { padding-block:80px; }
+.eyebrow,.section-label,.activity-photo-copy .eyebrow { font-size:13px; line-height:1.65; letter-spacing:.035em; }
+.section-label { margin-bottom:28px; }
+.topline { font-size:12px; letter-spacing:.025em; }
+.header { gap:22px; }.header nav { font-size:14px; gap:20px; }
+.header nav a { padding-block:10px; }
+.header-cta,.menu-toggle { font-size:14px; }
+.hero-description,.about-grid p:not(.lead),.departments p,
+.communication-roles dd,.team-story-grid p,.section-heading p,
+.program-lead p:not(.eyebrow):not(.program-headline),.program-roles p,
+.activity-photo-copy>p:not(.eyebrow),.invitation-reasons p,
+.join>div>p:not(.section-label),.faq details p,.archive-heading p { font-size:16px; line-height:1.8; }
+.hero-description { max-width:560px; }
+.button,.text-link,.activity-photo-copy .text-link,.team-source-links a,
+.hero-small a,.post-toggle,.post-source { font-size:14px; line-height:1.6; }
+.button { min-height:48px; padding:13px 22px; text-align:center; }
+.text-link { display:inline-block; padding-block:8px; }
+.hero-actions { flex-wrap:wrap; gap:16px 24px; margin:28px 0; }
+.motion-toggle,#interest-button { font-size:14px; min-height:44px; }
+.interest-panel { flex-wrap:wrap; gap:16px 20px; }
+.interest-number,.past-support { font-size:15px; }
+#interest-status,.past-support small { font-size:13px; line-height:1.7; }
+.photo-label,.hero-small span,.image-credit,.activity-photo-link>span { font-size:13px; line-height:1.6; letter-spacing:.025em; }
+.hero-small strong { font-size:18px; line-height:1.5; }
+.image-credit { text-align:left; }
+.ribbon { font-size:13px; letter-spacing:.025em; gap:32px; flex-wrap:wrap; }
+.team-facts dl div { grid-template-columns:120px minmax(0,1fr); font-size:15px; gap:14px; padding-block:16px; }
+.departments p { max-width:none; }.departments .department-intro { font-size:20px; line-height:1.6; }
+.communication-roles dt,.team-story-grid h4,.program-roles h5 { font-size:17px; line-height:1.55; }
+.communication-roles>div { padding-block:20px; }.communication-roles dd { margin-top:8px; }
+.team-story-grid { gap:32px; }.team-source-links { gap:12px 24px; }
+.section-heading p { max-width:370px; }
+.program-jumps [role=tab] { font-size:15px; min-height:52px; }
+.program-story figcaption,.program-source,.program-note,.gallery-help { font-size:14px; line-height:1.7; }
+.program-lead h3 { margin-bottom:14px; }.program-headline { margin-bottom:22px; }
+.program-contribute>p:not(.eyebrow):not(.program-note),.program-narrative>p { max-width:75ch; }
+.program-roles { margin-block:28px; }.program-roles h5 { margin-bottom:12px; }
+.program-source { padding-block:24px; }.program-note { margin-top:22px; }
+.activity-photo-copy { padding:28px; }.activity-photo-copy h3 { margin-bottom:18px; }
+.invitation-reasons article { padding:30px; }.invitation-bottom p { font-size:13px; letter-spacing:.035em; }
+.post-filters label,.post-meta,.post-results,.post-embed p,.archive-footnote,
+.archive-total small,.post-pagination span,.contact-card small,.contact-card span,
+.footer-bottom,.photo-position,.photo-caption,.photo-swipe-hint { font-size:14px; line-height:1.65; }
+.post-filters input,.post-filters select { font-size:16px; min-height:52px; }
+.post-meta { flex-wrap:wrap; gap:8px 16px; }
+.post-card h3 { font-size:22px; line-height:1.5; min-height:0; }
+.post-actions { flex-wrap:wrap; gap:12px 20px; }.post-toggle,.post-source { min-height:44px; display:inline-flex; align-items:center; }
+.post-pagination button { font-size:14px; min-height:44px; }
+.archive-footnote { margin-top:32px; }.archive-total small { white-space:normal; }
+.contact-card a { font-size:16px; line-height:1.8; display:inline-block; padding-block:4px; }
+.contact-card>div { margin-top:24px; }.join .interview-note { font-size:16px; line-height:1.8; padding:22px; }
+.faq summary { font-size:16px; line-height:1.65; }.faq details { padding:20px 22px; margin-bottom:14px; }
+.footer-top p { font-size:15px; line-height:1.7; }.footer-bottom { gap:14px 24px; }
+.photo-viewer button { font-size:15px; }.photo-caption { margin-block:14px; }
+@media(max-width:1100px) {
+  .header-cta { display:none; }
+  .team-story-grid,.invitation-reasons { grid-template-columns:1fr; }
+}
+@media(max-width:760px) {
+  .section { padding:56px 20px; }
+  .header { padding:12px 20px; gap:12px; }
+  .brand { font-size:14px; gap:10px; }.brand strong { font-size:16px; }
+  .header nav { font-size:16px; gap:8px; padding:16px 20px; }
+  .hero { padding-top:36px; gap:32px; }.hero h1 { font-size:clamp(36px,10vw,46px); line-height:1.22; }
+  h2 { font-size:clamp(29px,7.8vw,36px); line-height:1.3; }
+  .hero-small { gap:16px; grid-template-columns:1fr; }.hero-small img { max-height:230px; object-fit:cover; }
+  .hero-small strong { font-size:20px; }.hero-small span { display:block; margin-top:6px; }
+  .ribbon { padding:18px 20px; gap:12px 22px; justify-content:flex-start; }.ribbon span:last-child { max-width:none; }
+  .team-facts,.team-story,.departments article { padding:24px; }
+  .team-facts dl div { grid-template-columns:1fr; gap:4px; }
+  .about-grid,.faq-grid,.join { gap:36px; }.departments { margin-top:32px; gap:24px; }
+  .departments h3 { font-size:24px; }.team-story { margin-top:32px; }
+  .section-heading { margin-bottom:28px; }.section-heading p { max-width:none; margin-top:22px; }
+  .program-jumps[role=tablist] { margin-inline:0; gap:5px; padding:5px; }
+  .program-jumps [role=tab] { font-size:14px; min-height:60px; padding:10px 5px; }
+  .program-lead,.program-narrative,.program-contribute { padding:24px 20px; }
+  .program-photos { padding-inline:16px; gap:24px; }
+  .program-photos figure figcaption { padding:14px; }
+  .program-roles > div { padding:20px; }
+  .program-story h4 { font-size:23px; }.program-headline { font-size:29px; }
+  .activity-photo-copy { padding:24px; }.invitation-reasons article { padding:24px; }
+  .post-filters { gap:18px; }.post-filters label { font-size:14px; }
+  .post-card-top { padding:24px; }.post-grid { gap:24px; }
+  .archive-heading h2 { font-size:32px; }.archive-total { gap:18px; }
+  .post-pagination { gap:10px; flex-wrap:wrap; }
+  .contact-card { padding-top:28px; }.faq details { padding:18px; }
+  footer.section { padding:32px 20px; }.footer-top { gap:24px; }
+  .photo-viewer img { height:42dvh; max-height:42dvh; }
+}
+@media(max-width:350px) {
+  .section { padding-inline:16px; }.header { padding-inline:16px; }
+  .brand { font-size:13px; }.brand strong { font-size:15px; }.brand img { width:40px; height:40px; }
+  .program-jumps [role=tab] { font-size:13px; }
+  .program-lead,.program-narrative,.program-contribute { padding-inline:16px; }
+  .post-filters { grid-template-columns:1fr; }.post-filters label:first-child { grid-column:auto; }
+}
