@@ -35,7 +35,7 @@
       event.preventDefault();
       select(index);
       history.pushState(null, '', tab.hash);
-      nav.scrollIntoView({ block: 'start', behavior: 'instant' });
+      document.querySelector('#activities-title').scrollIntoView({ block: 'start', behavior: 'instant' });
     });
     tab.addEventListener('keydown', event => {
       let next;

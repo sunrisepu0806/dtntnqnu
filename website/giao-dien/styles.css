@@ -189,3 +189,5 @@ footer.section { padding-top:35px; padding-bottom:25px; background:var(--pale); 
 @media(max-width:760px) { .program-jumps[role=tablist] { margin-left:-10px; margin-right:-10px; padding:6px; gap:5px; }.program-jumps [role=tab] { font-size:12px; padding:10px 5px; }.program-lead>figure { order:-1; }.program-photos { grid-template-columns:1fr; gap:24px; }.program-story { padding:18px; }.program-contribute { padding:18px; }.photo-viewer { padding:12px; }.program-story figcaption { font-size:12px; }.program-narrative { margin-top:28px; } }
 
 .program-jumps[role=tablist] { scroll-margin-top:calc(var(--header-height,88px) + 6px); }
+
+.program-jumps a[aria-selected=true]:hover { background:var(--blue-dark); color:#fff; }
