@@ -187,3 +187,5 @@ footer.section { padding-top:35px; padding-bottom:25px; background:var(--pale); 
 .photo-viewer button { border:1px solid #c4d7ef; border-radius:10px; padding:10px 16px; min-height:44px; background:white; color:var(--blue-dark); }
 .photo-viewer button:disabled { opacity:.45; cursor:default; }.photo-controls { display:flex; justify-content:space-between; gap:12px; }.photo-caption { font-size:13px; margin:12px 0; }.photo-position { margin:0; font-size:13px; }
 @media(max-width:760px) { .program-jumps[role=tablist] { margin-left:-10px; margin-right:-10px; padding:6px; gap:5px; }.program-jumps [role=tab] { font-size:12px; padding:10px 5px; }.program-lead>figure { order:-1; }.program-photos { grid-template-columns:1fr; gap:24px; }.program-story { padding:18px; }.program-contribute { padding:18px; }.photo-viewer { padding:12px; }.program-story figcaption { font-size:12px; }.program-narrative { margin-top:28px; } }
+
+.program-jumps[role=tablist] { scroll-margin-top:calc(var(--header-height,88px) + 6px); }
