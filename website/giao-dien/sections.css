@@ -1,0 +1,62 @@
+/* PHÂN CHIA GIAO DIỆN: trắng để đọc, xanh nhạt cho ảnh, xanh đậm cho lời mời. */
+:root { --section-navy:#113f79; --section-blue:#eaf3ff; --section-border:#c8dbf2; }
+main > .section { border-bottom:1px solid var(--section-border); }
+.section-label { display:flex; align-items:center; gap:12px; line-height:1.7; }
+.section-label::before { content:''; width:24px; height:3px; border-radius:2px; background:currentColor; flex-shrink:0; }
+.about { background:#fff; }
+.departments { gap:24px; }
+.departments article { padding:28px; border:1px solid var(--section-border); border-top:4px solid var(--blue); border-radius:16px; background:#f7faff; }
+.team-facts,.team-story { border:1px solid var(--section-border); }
+.journey { background:var(--section-blue); }
+.journey > .section-heading { align-items:start; }
+.program-jumps[role=tablist] { background:#d9e9fc; border-color:#bdd2ed; box-shadow:0 5px 16px #113f7910; }
+.program-story { padding:0; overflow:clip; border-color:#bdd2ed; box-shadow:0 10px 30px #113f7908; }
+.program-lead { padding:36px; background:#fff; border-top:5px solid var(--blue); }
+.program-lead h3 { font-size:22px; }
+.program-narrative { max-width:none; margin:0; padding:32px 36px; background:#f3f7fd; border-block:1px solid var(--section-border); }
+.program-narrative > p { max-width:800px; }
+.program-narrative blockquote { max-width:800px; }
+.gallery-help { margin:0; padding:28px 36px 18px; color:var(--blue-dark); font-weight:600; }
+.program-photos { padding:0 36px; }
+.program-photos figure { background:#f5f8fc; border:1px solid #dce7f3; border-radius:14px; overflow:hidden; }
+.program-photos figure figcaption { margin:0; padding:13px 16px; color:#415976; }
+.program-photos .photo-open,.program-photos img { border-radius:0; }
+.program-source { margin:0; padding:22px 36px 28px; }
+.program-contribute { border-radius:0; padding:32px 36px; background:#e3efff; border-top:1px solid #bdd2ed; }
+.program-roles > div { background:white; border:1px solid #cedef2; border-radius:12px; padding:20px; }
+.program-roles { gap:16px; }
+.other-activities { padding-top:40px; border-top:2px solid #b8d0ee; }
+.team-invitation { background:var(--section-navy); color:white; }
+.team-invitation p,.team-invitation .invitation-reasons p { color:#deebfc; }
+.team-invitation .section-label,.team-invitation em { color:#b9dbff; }
+.team-invitation .invitation-reasons article { border-color:#ffffff40; background:#ffffff08; }
+.team-invitation .invitation-reasons article > span { color:#b9dbff; }
+.team-invitation .invitation-bottom { border-color:#ffffff40; }
+.team-invitation .primary { background:#fff; color:var(--section-navy); }
+.post-archive { background:#fff; }
+.post-card { background:#f5f8fd; }
+.join { background:var(--section-navy); }
+.faq { background:#f0f5fc; }
+.faq details { background:#fff; border:1px solid var(--line); padding:18px 20px; margin-bottom:12px; border-radius:12px; }
+footer.section { background:#fff; }
+.photo-viewer img { height:58dvh; max-height:58dvh; touch-action:pan-y pinch-zoom; user-select:none; -webkit-user-select:none; cursor:grab; }
+.photo-viewer img:active { cursor:grabbing; }
+.photo-swipe-hint { text-align:center; color:#4d6480; font-size:12px; margin:10px 0 0; }
+@media(max-width:760px) {
+  .section { padding-block:48px; }
+  .departments article { padding:22px; }
+  .program-lead { padding:20px; gap:20px; }
+  .program-narrative,.program-contribute { padding:24px 20px; }
+  .program-photos { padding:0 16px; gap:18px; }
+  .gallery-help { padding:22px 20px 16px; }
+  .program-source { padding:20px; }
+  .program-headline { font-size:28px; }
+  .program-narrative blockquote { font-size:18px; }
+  .program-roles { gap:12px; margin-block:22px; }
+  .program-roles > div { padding:18px; }
+  .photo-viewer { width:calc(100vw - 20px); max-height:94dvh; }
+  .photo-viewer img { height:48dvh; max-height:48dvh; }
+  .photo-caption { font-size:12px; line-height:1.6; }
+  .other-activities { margin-top:40px; }
+}
+@media(max-height:500px) { .photo-viewer img { height:38dvh; }.photo-viewer { overflow:auto; } }

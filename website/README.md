@@ -76,3 +76,8 @@ Số 2.523 lượt ủng hộ trước đây do Đội cung cấp sửa ở `noi
 
 ## Tab và bộ xem ảnh
 `chuc-nang/programs.js` điều khiển 3 tab và bộ xem ảnh phóng lớn (Đóng, Ảnh trước, Ảnh sau). Mỗi hoạt động có 5 ảnh. Đổi ảnh trong tệp nội dung của hoạt động; không cần sửa JavaScript. Trên điện thoại bộ ảnh xếp một cột và giữ nguyên tỷ lệ.
+
+## Màu phân khu và vuốt ảnh
+- Sửa màu nền, đường phân chia và khoảng cách trong giao-dien/sections.css.
+- Vuốt ngang trên ảnh mở lớn để chuyển ảnh; chuc-nang/swipe.js bỏ qua chạm nhẹ, cuộn dọc và nhiều ngón.
+

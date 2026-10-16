@@ -1,3 +1,4 @@
+import { bindPhotoSwipe } from './swipe.js';
 // Ba hoạt động dùng chung một vị trí trên trang chủ.
 (() => {
   const nav = document.querySelector('.program-jumps');
@@ -63,10 +64,20 @@
   dialog.innerHTML = '<div class="photo-toolbar"><p class="photo-position" aria-live="polite"></p><button type="button" class="photo-close" autofocus>Đóng</button></div><img alt=""><p class="photo-caption"></p><div class="photo-controls"><button type="button" class="photo-prev">Ảnh trước</button><button type="button" class="photo-next">Ảnh sau</button></div>';
   document.body.append(dialog);
   const display = dialog.querySelector('img');
+  display.draggable = false;
+  const swipeHint = document.createElement('p');
+  swipeHint.className = 'photo-swipe-hint';
+  swipeHint.textContent = 'Vuốt trái / phải trên ảnh để chuyển';
+  display.after(swipeHint);
   const caption = dialog.querySelector('.photo-caption');
   const previous = dialog.querySelector('.photo-prev');
   const next = dialog.querySelector('.photo-next');
   let photos = [], current = 0, opener;
+  function step(direction) {
+    const index = Math.max(0, Math.min(photos.length - 1, current + direction));
+    if (index !== current) { current = index; render(); }
+  }
+  const resetSwipe = bindPhotoSwipe(display, step);
   function render() {
     const photo = photos[current];
     display.src = photo.src;
@@ -92,9 +103,9 @@
     });
   });
   dialog.querySelector('.photo-close').addEventListener('click', () => dialog.close());
-  dialog.addEventListener('close', () => opener?.focus({ preventScroll: true }));
-  previous.addEventListener('click', () => { if (current > 0) { current--; render(); } });
-  next.addEventListener('click', () => { if (current < photos.length - 1) { current++; render(); } });
+  dialog.addEventListener('close', () => { resetSwipe(); opener?.focus({ preventScroll: true }); });
+  previous.addEventListener('click', () => step(-1));
+  next.addEventListener('click', () => step(1));
   dialog.addEventListener('keydown', event => {
     if (event.key === 'ArrowLeft') { event.preventDefault(); previous.click(); }
     if (event.key === 'ArrowRight') { event.preventDefault(); next.click(); }
