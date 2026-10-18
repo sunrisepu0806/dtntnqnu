@@ -1,0 +1,23 @@
+/* SỬA MÀU TẠI ĐÂY. Các tệp bố cục dùng lại biến này.
+ * Giữ đủ tương phản giữa nền xanh và chữ trắng.
+ */
+:root { --blue:#1260cf; --blue-dark:#13458b; --ink:#163451; --muted:#5c7188; --pale:#f0f6fd; --line:#dce7f3; --accent:#1260cf; }
+
+:root {
+  /* Nền xanh của các phần lớn và lớp màu phủ ảnh đầu trang. */
+  --section-blue: #176ac2;
+  --hero-overlay-solid: #176ac2f2;
+  --hero-overlay-clear: #176ac245;
+  --hero-overlay-mobile-start: #176ac2f5;
+  --hero-overlay-mobile-end: #176ac2a8;
+  /* Chân trang và nền thanh tiến độ. */
+  --footer-start: #145bb0;
+  --footer-end: #1974cb;
+  --scroll-track: #155a9e;
+}
+
+:root {
+  --section-navy: #113f79;
+  --section-pale: #eaf3ff;
+  --section-border: #c8dbf2;
+}

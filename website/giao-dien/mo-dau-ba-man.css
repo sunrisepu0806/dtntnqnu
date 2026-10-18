@@ -1,0 +1,91 @@
+/* Chuỗi mở đầu giống cách chuyển toàn màn của mẫu; xanh đậm / trắng / xanh đậm. */
+main > .about,main > .team-departments { display:block; min-height:0; }
+.chapter-anchor { margin-bottom:36px; }
+@media(min-width:1000px) {
+  .about .about-grid { display:grid; grid-template-columns:1.2fr 1fr; gap:48px; }
+  .about .team-facts { margin-top:0; }
+  .about .team-story-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
+  .team-departments .departments { grid-template-columns:1fr 1fr; }
+}
+.intro-scene { position:relative; min-height:calc(100svh - 88px); padding:38px 4vw 22px; display:flex; flex-direction:column; justify-content:space-between; isolation:isolate; }
+.intro-dark { background:var(--section-blue); color:#fff; --muted:#e3edf5; }
+.intro-light { background:#f8fafc; color:#143451; --muted:#52677c; }
+.intro-content { display:grid; grid-template-columns:1.2fr 1fr; gap:7vw; align-items:center; flex:1; padding-block:20px 32px; }
+.intro-copy { max-width:760px; }.intro-copy p { font-size:16px; line-height:1.75; }
+.intro-kicker { font-size:12px!important; font-weight:700; letter-spacing:.07em; text-transform:uppercase; margin-bottom:22px; }
+.intro-scene h1,.intro-scene h2 { font-size:clamp(34px,4.1vw,70px); line-height:1.12; font-weight:700; letter-spacing:-.035em; margin:0 0 24px; text-wrap:balance; color:inherit; }
+.intro-copy .intro-lead { font-size:clamp(18px,1.7vw,26px); line-height:1.5; font-weight:600; color:inherit; }
+.intro-welcome .intro-lead { border-left:3px solid #a9c9e9; padding-left:18px; }
+.intro-backdrop { position:absolute; z-index:-2; right:0; top:0; height:100%; width:62%; object-fit:cover; object-position:center; }
+.intro-welcome::before { content:''; position:absolute; inset:0; z-index:-1; background:linear-gradient(90deg,var(--section-blue) 30%,var(--hero-overlay-solid) 45%,var(--hero-overlay-clear) 100%); }
+.intro-welcome .intro-content { grid-template-columns:1.2fr 1fr; }
+.intro-scene .interest-panel { max-width:530px; margin:22px 0 0; }
+.intro-scene .interest-combined #interest-button { background:#fff; color:#123b60; border-color:white; }
+.intro-scene .interest-combined #interest-button:hover:not(:disabled) { background:#dcecff; }
+.intro-scene .interest-combined .interest-total { border-color:#afc6df80; }
+.intro-scene .interest-total strong,.intro-scene .interest-total > span { color:white; }
+.intro-scene #interest-status { color:#e1edf7; font-size:12px; }
+.intro-bottom { display:flex; align-items:center; justify-content:space-between; gap:20px; padding-top:18px; border-top:1px solid #8da9c04d; font-size:12px; font-weight:600; letter-spacing:.025em; }
+.intro-bottom button { background:none; border:0; color:inherit; font:inherit; padding:10px 0; text-align:left; }
+.intro-bottom a,.intro-link { border-bottom:1px solid currentColor; padding-block:10px; }
+.intro-link { display:inline-block; font-size:14px; font-weight:600; color:inherit; }
+.intro-fact { background:#fff; border-block:1px solid #9caebd; padding:28px 32px; }
+.intro-fact > strong { display:block; font-size:clamp(52px,6.5vw,106px); line-height:1; letter-spacing:-.05em; color:#9bb4ca; margin-bottom:24px; }
+.intro-fact > strong > span { display:block; }
+.intro-fact h3 { font-size:24px; margin-bottom:14px; }.intro-fact > span { font-size:12px; font-weight:600; }
+.intro-photo { margin:0; }.intro-photo img { width:100%; max-height:52svh; object-fit:cover; }.intro-photo figcaption { font-size:13px; margin-top:12px; color:#e1edf7; }
+.intro-preferences { padding:10px 4vw; background:#fff; }.intro-preferences .motion-toggle { margin:0; }
+/* JS bật phần ghim. Không có JS, ba màn vẫn đọc được theo thứ tự. */
+.intro-stages.is-staged { height:calc(var(--intro-height) * 3); }
+.is-staged .intro-pin { position:sticky; top:var(--intro-top); height:var(--intro-height); }
+.is-staged .intro-scene { position:absolute; inset:0; min-height:0; height:100%; overflow-y:auto; overscroll-behavior-y:auto; visibility:hidden; opacity:0; pointer-events:none; }
+.is-staged .intro-scene.is-active { visibility:visible; opacity:1; pointer-events:auto; }
+@media(prefers-reduced-motion:no-preference) { .is-staged .intro-scene { transition:opacity .25s ease; } }
+@media(min-width:900px) and (max-height:780px) {
+  .intro-scene { padding-top:22px; }.intro-content { gap:5vw; padding-block:10px 18px; }
+  .intro-scene h1,.intro-scene h2 { font-size:clamp(32px,3.5vw,54px); margin-bottom:16px; }
+  .intro-kicker { margin-bottom:14px; }.intro-copy p { margin-bottom:14px; }
+  .intro-scene .interest-combined #interest-button,.intro-scene .interest-total { min-height:56px; }
+  .intro-fact { padding:22px; }.intro-fact > strong { font-size:64px; }
+}
+@media(max-width:899px) {
+  .intro-scene { padding:22px 20px 16px; }
+  .intro-content,.intro-welcome .intro-content { grid-template-columns:1fr; gap:22px; padding:8px 0 22px; }
+  .intro-scene h1,.intro-scene h2 { font-size:clamp(32px,7vw,46px); margin-bottom:18px; }
+  .intro-kicker { margin-bottom:16px; }.intro-copy .intro-lead { font-size:18px; }
+  .intro-backdrop { width:100%; opacity:.3; }.intro-welcome::before { background:linear-gradient(90deg,var(--hero-overlay-mobile-start),var(--hero-overlay-mobile-end)); }
+  .intro-fact { padding:20px; }.intro-fact > strong { font-size:48px; }
+  .intro-photo img { max-height:30svh; object-fit:contain; }
+  .intro-bottom { gap:12px; font-size:11px; flex-wrap:wrap; }.intro-bottom span { margin-left:auto; }
+  .intro-bottom a { width:100%; }
+}
+
+/* Đầu trang: tên đầy đủ, menu lùi vào trong; trạng thái chỉ đọc bằng trình đọc màn hình. */
+.header { padding-inline:clamp(20px,5vw,88px); gap:32px; justify-content:space-between; }
+.header .brand { min-width:0; flex-shrink:1; gap:12px; }
+.header .brand > span { min-width:0; }
+.header .brand strong { display:block; font-size:17px; line-height:1.45; }
+.header .brand-school { display:block; font-size:14px; line-height:1.6; color:#36566e; }
+.header .brand img { flex-shrink:0; }
+.header nav { flex:0 1 auto; margin-right:2vw; gap:24px; }
+.interest-combined #interest-status { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; border:0; }
+@media(max-width:1050px) {
+  .header { gap:16px; }
+  .header .menu-toggle { display:block; flex-shrink:0; }
+  .header nav { display:none; position:absolute; top:100%; left:0; right:0; margin:0; padding:20px 6vw; background:#fff; border-bottom:1px solid #dce6ee; }
+  .header nav.open { display:flex; flex-direction:column; gap:12px; align-items:stretch; }
+  .header nav a { padding:12px 16px; }
+}
+@media(max-width:600px) {
+  .header { padding:12px 16px; gap:10px; }
+  .header .brand { gap:9px; }
+  .header .brand img { width:42px; height:42px; }
+  .header .brand strong { font-size:14px; }
+  .header .brand-school { font-size:12px; }
+}
+
+/* Thanh trắng lấp đầy theo nhịp cuộn, ghim ở đáy mỗi màn mở đầu. */
+.intro-scroll-progress { display:none; }
+.is-staged .intro-scroll-progress { display:block; position:absolute; z-index:5; inset:auto 0 0; height:6px; background:var(--scroll-track); pointer-events:none; }
+.intro-scroll-progress > span { display:block; width:100%; height:100%; background:#fff; transform:scaleX(var(--scroll-fill,0)); transform-origin:left; }
+@media(prefers-reduced-motion:no-preference) { .intro-scroll-progress > span { transition:transform .12s linear; } }

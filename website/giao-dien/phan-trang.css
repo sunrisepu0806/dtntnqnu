@@ -1,0 +1,32 @@
+/* NHỊP ĐỌC TOÀN TRANG: mỗi phần một nền, trắng và xanh nhạt luân phiên. */
+main > .section { border:0; border-top:1px solid #bfd4ed; padding-block:80px; }
+main > .hero { background:#fff; border-top:0; padding-block:32px 48px; }
+main > .about,main > .journey,main > .post-archive,main > .faq { background:#e5f0fc; }
+main > .team-departments,main > .team-invitation,main > .join { background:#fff; color:var(--ink); }
+main > .section > .section-label,
+.invitation-heading > .section-label,
+.join > div > .section-label { display:flex; gap:14px; width:100%; padding-bottom:18px; margin-bottom:32px; border-bottom:1px solid #adc9e8; color:var(--blue-dark); font-size:13px; font-weight:700; letter-spacing:.06em; }
+.section-label::before { width:32px; height:3px; }
+.about .team-story { background:#ffffffb8; border-color:#c7d9ee; }
+.team-departments .departments { margin-top:32px; }
+.team-departments .departments article { background:#f4f8fe; }
+.team-invitation p,.team-invitation .invitation-reasons p { color:var(--muted); }
+.team-invitation em,.team-invitation .section-label,.team-invitation .invitation-reasons article > span { color:var(--blue); }
+.team-invitation .invitation-reasons article { background:#f4f8fe; border-color:#d1e1f3; }
+.team-invitation .invitation-bottom { border-color:#c8dbf2; }
+.team-invitation .primary { background:var(--blue); color:white; }
+.post-archive .post-card { background:white; border-color:#c8dbf2; }
+.join h2,.join h3 { color:var(--ink); }.join em,.join .section-label { color:var(--blue); }
+.join p,.join > div > p:not(.section-label),.join .contact-card span,.join .contact-card small { color:var(--muted); }
+.join .contact-card { padding:32px; border:1px solid #c8dbf2; border-radius:16px; background:#f0f6fd; color:var(--ink); }
+.join .contact-card .eyebrow { color:var(--blue); }
+.join .interview-note { border-color:#c8dbf2; background:#f0f6fd; }
+.join .button.white { background:var(--blue); color:white; }
+.chapter-links { display:flex; flex-wrap:wrap; gap:8px 22px; margin-top:30px; padding-top:20px; border-top:1px solid #c8dbf2; }
+.chapter-links a { font-size:14px; font-weight:600; color:var(--blue-dark); padding:8px 0; text-decoration:underline; text-underline-offset:5px; }
+@media(max-width:760px) {
+  main > .section { padding-block:48px; }
+  main > .hero { padding-block:24px 36px; }
+  main > .section > .section-label,.invitation-heading > .section-label,.join > div > .section-label { font-size:12px; margin-bottom:26px; padding-bottom:16px; letter-spacing:.025em; }
+  .join .contact-card { padding:24px; }.chapter-links { gap:4px 18px; }
+}

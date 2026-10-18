@@ -1,19 +1,26 @@
 import { createHash } from 'node:crypto';
+import { createTokenProvider } from './firebase-token.mjs';
+const serverToken = createTokenProvider(process.env);
 
 // Chỉ dùng collection riêng của website; không đọc dữ liệu thành viên.
 const validId = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 export function createStore(env = process.env, request = fetch) {
-  const project = env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+  const project = env.FIREBASE_PROJECT_ID || env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
   const key = env.NEXT_PUBLIC_FIREBASE_API_KEY;
-  if (!project || !key) throw new Error('Missing Firebase configuration');
+  const authenticated = Boolean(env.FIREBASE_SERVICE_ACCOUNT_JSON);
+  if (!project || (!key && !authenticated)) throw new Error('Missing Firebase configuration');
+  const token = env === process.env ? serverToken : createTokenProvider(env, request);
   const base = `projects/${project}/databases/(default)/documents`;
   // Preview có dữ liệu riêng, không cộng lượt thử vào website chính thức.
   const collection = env.VERCEL_ENV === 'preview' ? 'qnu_website_preview_counters' : 'qnu_website_counters';
   const counter = `${base}/${collection}/interest`;
   const marker = id => `${counter}/visitors/${createHash('sha256').update(id).digest('hex')}`;
   async function call(path, options = {}) {
-    const response = await request(`https://firestore.googleapis.com/v1/${path}?key=${encodeURIComponent(key)}`, {
-      ...options, headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(8000),
+    const headers = { 'Content-Type': 'application/json' };
+    if (authenticated) headers.Authorization = `Bearer ${await token()}`;
+    const query = authenticated ? '' : `?key=${encodeURIComponent(key)}`;
+    const response = await request(`https://firestore.googleapis.com/v1/${path}${query}`, {
+      ...options, headers, signal: AbortSignal.timeout(8000),
     });
     if (response.status === 404 && !options.method) return null;
     const body = await response.json();

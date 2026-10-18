@@ -13,7 +13,7 @@ navigation?.querySelectorAll('a').forEach(link => link.addEventListener('click',
 
 // Reveal once on scroll; keyboard focus and reduced-motion always show content.
 const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
-const revealTargets = document.querySelectorAll('.hero-copy, .hero-visual, .about-grid > *, .departments article, .section-heading, .activity-photo-card, .campaign-summary, .invitation-heading, .invitation-reasons article, .invitation-bottom, .join > *');
+const revealTargets = document.querySelectorAll('.about-grid > *, .departments article, .section-heading, .activity-photo-card, .campaign-summary, .invitation-heading, .invitation-reasons article, .invitation-bottom, .join > *');
 let revealObserver;
 const motionToggle = document.querySelector('#motion-toggle');
 function setMotion(enabled) {

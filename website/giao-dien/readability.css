@@ -1,21 +1,40 @@
 /* CỠ CHỮ VÀ KHOẢNG CÁCH — chỉnh tại đây, áp dụng sau các tệp giao diện khác. */
 body { font-size:16px; line-height:1.75; }
+/* Đầu trang: số lượt và thao tác nằm cùng thẻ, có vai trò riêng. */
+.hero-opening { font-size:20px; font-weight:600; color:var(--blue-dark); line-height:1.6; margin-bottom:18px; }
+.interest-panel.interest-combined { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:12px 18px; border:1px solid #c9ddf5; padding:18px 20px; margin:24px 0; border-radius:18px; background:#f1f7ff; max-width:500px; }
+.interest-combined .interest-total { display:flex; flex-direction:column; text-align:left; line-height:1.5; }
+.interest-combined .interest-total strong { font-size:30px; font-variant-numeric:tabular-nums; color:var(--blue-dark); }
+.interest-combined .interest-total > span { font-size:14px; color:var(--muted); }
+.interest-combined #interest-button { width:auto; min-height:50px; padding:12px 20px; border:1px solid var(--blue); border-radius:12px; background:var(--blue); color:white; font-size:16px; font-weight:600; white-space:nowrap; box-shadow:0 4px 12px #1260cf20; }
+.interest-combined #interest-button:hover:not(:disabled) { background:var(--blue-dark); }
+.interest-combined #interest-button[aria-pressed=true] { background:white; color:var(--blue-dark); box-shadow:none; }
+.interest-combined #interest-button:disabled { cursor:default; opacity:1; }
+.interest-combined #interest-status { grid-column:1 / -1; margin:0; padding-top:10px; border-top:1px solid #d7e5f5; font-size:13px; line-height:1.6; }
+@media(max-width:390px) { .interest-panel.interest-combined { padding:16px; gap:10px; }.interest-combined #interest-button { padding:12px 14px; font-size:14px; }.interest-combined .interest-total > span { font-size:13px; }.hero-opening { font-size:18px; } }
+/* Hiệu ứng ngắn, không lặp liên tục; tôn trọng tùy chọn giảm chuyển động. */
+@keyframes hero-photo-drift { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-6px); } }
+@keyframes hero-line-in { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:none; } }
+@media(prefers-reduced-motion:no-preference) {
+  .motion-enabled .hero-team { animation:hero-photo-drift 4s ease-in-out 1; }
+  .motion-enabled .hero-opening { animation:hero-line-in .8s ease-out both; animation-delay:.2s; }
+  .motion-enabled .interest-combined #interest-button { transition:background .2s,box-shadow .2s; }
+}
 h1,h2,h3 { line-height:1.3; letter-spacing:-.025em; text-wrap:balance; }
 p,dd,figcaption { overflow-wrap:break-word; }
 .section { padding-block:80px; }
 .eyebrow,.section-label,.activity-photo-copy .eyebrow { font-size:13px; line-height:1.65; letter-spacing:.035em; }
 .section-label { margin-bottom:28px; }
-.topline { font-size:12px; letter-spacing:.025em; }
 .header { gap:22px; }.header nav { font-size:14px; gap:20px; }
 .header nav a { padding-block:10px; }
-.header-cta,.menu-toggle { font-size:14px; }
+.menu-toggle { font-size:14px; }
 .hero-description,.about-grid p:not(.lead),.departments p,
 .communication-roles dd,.team-story-grid p,.section-heading p,
 .program-lead p:not(.eyebrow):not(.program-headline),.program-roles p,
 .activity-photo-copy>p:not(.eyebrow),.invitation-reasons p,
 .join>div>p:not(.section-label),.faq details p,.archive-heading p { font-size:16px; line-height:1.8; }
 .hero-description { max-width:560px; }
-.button,.text-link,.activity-photo-copy .text-link,.team-source-links a,
+.button,.text-link,.activity-photo-copy .text-link,
 .hero-small a,.post-toggle,.post-source { font-size:14px; line-height:1.6; }
 .button { min-height:48px; padding:13px 22px; text-align:center; }
 .text-link { display:inline-block; padding-block:8px; }
@@ -32,7 +51,7 @@ p,dd,figcaption { overflow-wrap:break-word; }
 .departments p { max-width:none; }.departments .department-intro { font-size:20px; line-height:1.6; }
 .communication-roles dt,.team-story-grid h4,.program-roles h5 { font-size:17px; line-height:1.55; }
 .communication-roles>div { padding-block:20px; }.communication-roles dd { margin-top:8px; }
-.team-story-grid { gap:32px; }.team-source-links { gap:12px 24px; }
+.team-story-grid { gap:32px; }
 .section-heading p { max-width:370px; }
 .program-jumps [role=tab] { font-size:15px; min-height:52px; }
 .program-story figcaption,.program-source,.program-note,.gallery-help { font-size:14px; line-height:1.7; }
@@ -57,7 +76,6 @@ p,dd,figcaption { overflow-wrap:break-word; }
 .footer-top p { font-size:15px; line-height:1.7; }.footer-bottom { gap:14px 24px; }
 .photo-viewer button { font-size:15px; }.photo-caption { margin-block:14px; }
 @media(max-width:1100px) {
-  .header-cta { display:none; }
   .team-story-grid,.invitation-reasons { grid-template-columns:1fr; }
 }
 @media(max-width:760px) {
@@ -104,3 +122,10 @@ p,dd,figcaption { overflow-wrap:break-word; }
 .post-archive .section-label>span:last-child { margin-left:auto; }
 @media(max-width:760px) { .post-archive .section-label { display:block; }.post-archive .section-label::before { display:none; }.post-archive .section-label>span { display:block; }.post-archive .section-label>span:last-child { margin:8px 0 0; } }
 @media(max-width:600px) { .post-filters { grid-template-columns:1fr; }.post-filters label:first-child { grid-column:auto; } }
+
+/* Căn hàng nút bài viết theo đáy thẻ, dù tiêu đề dài ngắn khác nhau. */
+.post-grid { align-items:stretch; }
+.post-card { display:flex; flex-direction:column; }
+.post-card-top { display:flex; flex-direction:column; flex:1; }
+.post-actions { margin-top:auto; }
+.post-card:has(.post-embed:not([hidden])) .post-card-top { flex:0 0 auto; }

@@ -1,0 +1,45 @@
+/* TRẮNG / XANH ĐẬM: đảo màu chữ theo nền, đọc từng chương khi cuộn. */
+main > .about,main > .journey,main > .post-archive,main > .faq { background:var(--section-blue); color:#fff; }
+main > :is(.about,.journey,.post-archive,.faq) { --muted:#e3edf5; }
+main > :is(.about,.journey,.post-archive,.faq) h2,
+main > :is(.about,.journey,.post-archive,.faq) > h3 { color:#fff; }
+main > :is(.about,.journey,.post-archive,.faq) h2 em { color:#eef6ff; }
+main > :is(.about,.journey,.post-archive,.faq) > .section-label,
+.about .chapter-anchor .section-label { color:#eef6ff; border-color:#ffffff40; }
+.chapter-anchor .section-label { padding-bottom:20px; border-bottom:1px solid #c8dbf2; margin-bottom:30px; }
+.chapter-summary { margin-top:24px; max-width:34ch; }
+.chapter-next { display:inline-block; font-size:14px; font-weight:600; padding:16px 0; margin-top:20px; border-bottom:1px solid currentColor; color:var(--blue-dark); }
+.about .chapter-next { color:#eef6ff; }
+.chapter-body { min-width:0; }
+.about .about-grid .lead { color:#edf5ff; }
+.about .about-grid { display:block; }.about .team-facts { margin-top:32px; }
+.about .team-facts,.about .team-story,.journey .program-story,.journey .activity-photo-card,.post-archive .post-card,.faq details { --muted:#5c7188; color:var(--ink); background:white; }
+.about .team-facts h3,.about .team-story h3,.about .team-story h4 { color:var(--ink); }
+.about .team-story .section-label { color:var(--blue); }
+.about .team-story { border:0; }
+.about .team-story-grid { grid-template-columns:1fr; gap:24px; }
+.journey .other-activities > h3 { color:white; }
+.journey .other-activities > .section-label,.journey > .text-link { color:#eef6ff; }
+.journey .other-activities { border-color:#ffffff40; }
+.post-archive .archive-total,.post-archive .archive-total strong,.post-archive .archive-total small,.post-archive .post-results,.post-archive .archive-footnote { color:#e3edf5; }
+.post-archive .post-filters label { color:#e3edf5; }
+.post-archive .post-pagination { color:white; }
+.post-archive .archive-heading p,.post-archive .post-pagination span,.post-archive .post-empty { color:#e3edf5; }
+.post-archive .post-pagination button { color:var(--blue-dark); background:white; }
+.faq summary { color:var(--ink); }
+@media(min-width:1000px) {
+  main > .hero { min-height:calc(100svh - 90px); }
+  main > .about,main > .team-departments { display:grid; grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr); gap:7vw; min-height:100svh; align-items:start; padding-block:76px; }
+  .chapter-anchor h2 { font-size:clamp(32px,3vw,48px); }
+  .team-departments .chapter-anchor .section-heading { margin-bottom:0; }
+  .team-departments .chapter-anchor .chapter-next { margin-top:6px; }
+  .team-departments .section-heading { display:block; }
+  .team-departments .section-heading p { margin-top:24px; max-width:36ch; }
+  .team-departments .departments { grid-template-columns:1fr; margin:0; gap:32px; }
+  .team-departments .departments article { padding:36px; border-radius:0; }
+}
+@media(max-width:999px) {
+  .chapter-anchor { margin-bottom:36px; }
+  .chapter-next { margin-top:4px; }
+  .chapter-anchor h2 { font-size:34px; }
+}

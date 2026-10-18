@@ -1,5 +1,5 @@
 /* PHÂN CHIA GIAO DIỆN: trắng để đọc, xanh nhạt cho ảnh, xanh đậm cho lời mời. */
-:root { --section-navy:#113f79; --section-blue:#eaf3ff; --section-border:#c8dbf2; }
+/* Màu phân khu được khai báo trong 00-mau-sac.css. */
 main > .section { border-bottom:1px solid var(--section-border); }
 .section-label { display:flex; align-items:center; gap:12px; line-height:1.7; }
 .section-label::before { content:''; width:24px; height:3px; border-radius:2px; background:currentColor; flex-shrink:0; }
@@ -7,7 +7,7 @@ main > .section { border-bottom:1px solid var(--section-border); }
 .departments { gap:24px; }
 .departments article { padding:28px; border:1px solid var(--section-border); border-top:4px solid var(--blue); border-radius:16px; background:#f7faff; }
 .team-facts,.team-story { border:1px solid var(--section-border); }
-.journey { background:var(--section-blue); }
+.journey { background:var(--section-pale); }
 .journey > .section-heading { align-items:start; }
 .program-jumps[role=tablist] { background:#d9e9fc; border-color:#bdd2ed; box-shadow:0 5px 16px #113f7910; }
 .program-story { padding:0; overflow:clip; border-color:#bdd2ed; box-shadow:0 10px 30px #113f7908; }

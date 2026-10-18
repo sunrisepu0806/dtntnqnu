@@ -1,86 +1,97 @@
-# BẮT ĐẦU Ở ĐÂY — Website Đội TNTN QNU
+# Sửa website Đội TNTN QNU
 
-Mở `DTNTNQNU.code-workspace` ở thư mục bên ngoài bằng VS Code. Cửa sổ chỉ hiện phần website quảng bá để dễ sửa.
+Mở **DTNTNQNU.code-workspace** ở thư mục bên ngoài bằng VS Code. Workspace chỉ hiện website quảng bá, không lẫn ứng dụng cũ.
 
-## Tôi muốn sửa phần nào?
+## Bắt đầu trong 3 bước
 
-| Phần trên web | Mở tệp |
+1. Chọn **Terminal → Run Task → QNU: Xem thử website** (chỉ chạy một lần).
+2. Mở http://127.0.0.1:5174/.
+3. Sửa tệp → Ctrl+S → tải lại trình duyệt.
+
+Cần Node.js 22 trở lên. Không cần cài thêm thư viện. Trong Terminal tại thư mục website có thể dùng npm run dev, npm run build và npm test.
+
+## Muốn sửa gì, mở tệp nào?
+
+| Muốn sửa | Tệp |
 | --- | --- |
-| Logo, menu, tiêu đề trình duyệt, chân trang | `noi-dung/00-khung-trang.html` |
-| Khẩu hiệu, ảnh đầu trang, nút Quan tâm | `noi-dung/01-dau-trang.html` |
-| Ngày thành lập, giới thiệu chung | `noi-dung/02-gioi-thieu-doi.html` |
-| Câu chuyện, lịch sử, liên kết Beacons | `noi-dung/02a-cau-chuyen-doi.html` |
-| Ban Truyền thông và Ban Sự kiện | `noi-dung/02b-cac-ban.html` |
-| Các hoạt động và ảnh đại diện | `noi-dung/03-hoat-dong.html` |
-| Lời quảng bá, mời đồng hành | `noi-dung/04-loi-moi-dong-hanh.html` |
-| Tiêu đề và bộ lọc danh mục Facebook | `noi-dung/05-bai-facebook.html` |
-| Email, fanpage, thông báo chờ phỏng vấn | `noi-dung/06-lien-he-phong-van.html` |
-| Câu hỏi thường gặp | `noi-dung/07-cau-hoi.html` |
-| Thêm/sửa bài Facebook | `du-lieu/bai-facebook.js` |
-| Màu, kích thước chữ, bố cục, hiệu ứng | `giao-dien/styles.css` |
-| Ảnh/logo | `public/assets/` |
+| Tên trang, mô tả tìm kiếm, logo đầu trang, menu | [00-khung-trang.html](noi-dung/00-khung-trang.html) |
+| Ba màn mở đầu, khẩu hiệu, ảnh tập thể, nút Quan tâm | [01-dau-trang.html](noi-dung/01-dau-trang.html) |
+| Giới thiệu, ngày thành lập, đơn vị trực thuộc | [02-gioi-thieu-doi.html](noi-dung/02-gioi-thieu-doi.html) |
+| Ba hướng hoạt động của Đội | [02a-cau-chuyen-doi.html](noi-dung/02a-cau-chuyen-doi.html) |
+| Công việc Ban Truyền thông và Ban Sự kiện | [02b-cac-ban.html](noi-dung/02b-cac-ban.html) |
+| Tiêu đề chung của phần các ban | [02c-cac-ban-section.html](noi-dung/02c-cac-ban-section.html) |
+| Lời dẫn, ba tab hoạt động, hoạt động khác | [03-hoat-dong.html](noi-dung/03-hoat-dong.html) |
+| Câu chuyện và ảnh Mùa hè xanh | [03a-mua-he-xanh.html](noi-dung/03a-mua-he-xanh.html) |
+| Câu chuyện và ảnh Trung thu cho em | [03b-trung-thu-cho-em.html](noi-dung/03b-trung-thu-cho-em.html) |
+| Câu chuyện và ảnh Xuân yêu thương | [03c-xuan-yeu-thuong.html](noi-dung/03c-xuan-yeu-thuong.html) |
+| Lời mời đồng hành | [04-loi-moi-dong-hanh.html](noi-dung/04-loi-moi-dong-hanh.html) |
+| Tiêu đề nhật ký và bộ lọc | [05-bai-facebook.html](noi-dung/05-bai-facebook.html) |
+| Email, fanpage, thông tin chờ phỏng vấn | [06-lien-he-phong-van.html](noi-dung/06-lien-he-phong-van.html) |
+| Câu hỏi thường gặp | [07-cau-hoi.html](noi-dung/07-cau-hoi.html) |
+| Logo, số điện thoại, liên kết cuối trang | [08-chan-trang.html](noi-dung/08-chan-trang.html) |
+| Danh sách bài Facebook | [bai-facebook.js](du-lieu/bai-facebook.js) |
+| Màu chủ đạo, nền các phần, chân trang | [00-mau-sac.css](giao-dien/00-mau-sac.css) |
+| Độ nhạy cuộn và vuốt ba màn đầu | [intro-stages.js](chuc-nang/intro-stages.js), mục scrollOptions ở đầu tệp |
 
-## Sửa chữ và ảnh
+## Sửa chữ, ảnh, liên kết
 
-Trong HTML, chỉ thay chữ nằm giữa các thẻ. Ví dụ `<h3>Ban Truyền thông</h3>`.
-Đừng xóa `id`, `class`, các thẻ đóng hoặc dòng `INCLUDE`: chúng nối từng phần lại với nhau.
+- Sửa chữ giữa thẻ: <h3>Ban Truyền thông</h3>.
+- Giữ id, class và các dòng INCLUDE để menu, tab và việc ghép trang tiếp tục hoạt động.
+- Ảnh đặt trong public/assets/. Trong HTML dùng src="/assets/ten-anh.jpg", kèm alt mô tả ảnh. Tên tệp nên không dấu, cách nhau bằng dấu gạch ngang.
+- Đổi liên kết trong href. Chỉ cần sửa ảnh trong tệp hoạt động tương ứng; bộ xem ảnh tự đọc các ảnh đó.
+- Ba hoạt động được ghép ngay trên trang chủ. Thư mục noi-dung/trang-hoat-dong chỉ giữ chuyển hướng từ các địa chỉ cũ.
 
-Thay ảnh: chép ảnh vào `public/assets/`, rồi sửa `src="/assets/ten-anh.jpg"` và `alt="Mô tả ảnh"` trong phần tương ứng.
-Giữ tên ảnh không dấu, dùng dấu gạch ngang. Liên kết nằm trong `href="..."`.
+## Chỉnh màu và bố cục
 
-## Xem ngay trên máy
+Màu chung nằm ở **giao-dien/00-mau-sac.css**. Ví dụ --section-blue đổi nền các phần xanh. Các biến hero-overlay là màu phủ ảnh có độ trong suốt; đổi cùng tông nếu thay màu chủ đạo.
 
-Cần Node.js 22 trở lên. Không cần cài thư viện.
+| Tệp CSS | Phụ trách |
+| --- | --- |
+| fonts.css | Phông chữ |
+| styles.css | Nền tảng, thành phần và bố cục hoạt động |
+| posts.css | Nhật ký bài viết |
+| sections.css | Phân khu và bộ ảnh |
+| readability.css | Cỡ chữ, khoảng cách, căn hàng thẻ bài viết |
+| dau-chan-trang.css | Nút Quan tâm và chân trang |
+| phan-trang.css, chuong-cuon.css | Các phần nội dung xen kẽ trắng–xanh |
+| mo-dau-ba-man.css | Ba màn đầu, thanh tiến độ và bố cục đầu trang hiện tại |
 
-1. Trong VS Code chọn **Terminal → Run Task → QNU: Xem thử website**.
-2. Mở **http://127.0.0.1:5174**.
-3. Sửa nội dung → Ctrl+S → tải lại trình duyệt.
+Thứ tự tải CSS nằm trong 00-khung-trang.html; quy tắc tải sau có thể ghi đè quy tắc trước. Khi sửa header hoặc ba màn đầu, bắt đầu ở mo-dau-ba-man.css. Khi sửa chữ chung, bắt đầu ở readability.css.
 
-Hoặc mở Terminal trong thư mục `website` và chạy `npm run dev`.
-Chạy `npm run build` để kiểm tra và ghép trang. Không sửa thư mục `dist`, vì nó được tạo tự động.
+## Chỉnh cảm giác cuộn
 
-## Đăng bản mới lên Vercel
+Trong scrollOptions của chuc-nang/intro-stages.js:
 
-Dự án: `dtntnqnu`. Địa chỉ mục tiêu: https://dtntnqnu.vercel.app
-Mã nguồn GitHub: https://github.com/sunrisepu0806/dtntnqnu
+- wheelThreshold: tăng để cần cuộn nhiều hơn trước khi chuyển màn.
+- swipeDistance: tăng để cần vuốt dài hơn trên điện thoại.
+- minimumScrollTime: thời gian cuộn tối thiểu, đơn vị mili giây.
+- transitionCooldown: khoảng nghỉ sau khi chuyển màn.
+- fullBarHold: thời gian thanh trắng hiện đầy trước khi chuyển.
+- wheelStepLimit và resetAfterPause: giới hạn mỗi nhịp và thời gian ngắt giữa các nhịp.
 
-Sau khi xem thử, dùng Source Control của VS Code để Commit và Sync Changes lên nhánh production của kho GitHub.
-Vercel tự tạo bản triển khai mới; đợi trạng thái Ready rồi tải lại web online. Lưu tệp trên máy chưa tự đổi web online.
-Cấu hình Vercel nằm ở `../vercel.json`. Các thư mục khác ở cấp cha là mã ứng dụng cũ, được giữ để khôi phục, không dùng cho giao diện quảng bá này.
+Các nút chuyển màn vẫn dùng ngay, không cần đợi thanh đầy.
 
 ## Bộ đếm Quan tâm
 
-- Mã trình duyệt: `chuc-nang/interest.js`. API Vercel: `../api/interest.js`, xử lý tại `server/interest.mjs`.
-- Dùng Firebase của dự án qua các biến môi trường đã có trên Vercel. Collection riêng: `qnu_website_counters`; lượt thử preview nằm riêng trong `qnu_website_preview_counters`.
-- Một thao tác nguyên tử vừa ghi dấu lượt quan tâm, vừa cộng bộ đếm. Nhấn lặp cùng trình duyệt không cộng hai lần.
-- Dữ liệu D1 của bản Sites cũ không tự chuyển sang Firebase. Bản này đếm riêng từ khi chuyển hosting.
-- Không dùng số giả hoặc localStorage thay cho số chung. Nếu thiếu cấu hình/quyền Firebase, trang hiển thị lỗi kết nối.
-- Xem thử trên máy vẫn sửa được giao diện khi chưa cấu hình Firebase; chỉ bộ đếm cần cấu hình máy chủ.
-- Không đưa mật khẩu, token hay tệp `.env` lên GitHub.
+Số nền hiện tại là **2.352**, cộng thêm số lượt do máy chủ lưu. Trong 01-dau-trang.html, nếu cập nhật số nền thực tế, sửa cả data-base-count và chữ hiển thị trong interest-count. Không tự tăng số để thử.
 
-## Các tệp chức năng ít cần sửa
+- chuc-nang/interest.js: giao diện bộ đếm, tải lại số mỗi 3 giây.
+- server/interest.mjs và ../api/interest.js: xử lý Firebase trên máy chủ.
+- Cần biến môi trường Firebase để bộ đếm hoạt động; thiếu cấu hình không ảnh hưởng việc xem giao diện.
+- Dòng trạng thái được ẩn khỏi giao diện và giữ cho trình đọc màn hình.
+- Không đưa mật khẩu, token hoặc tệp .env vào Git.
 
-`chuc-nang/app.js`: menu và hiệu ứng. `chuc-nang/posts.js`: bộ lọc và phân trang Facebook.
-`scripts/build.mjs`: ghép các phần nội dung. `scripts/dev.mjs`: máy chủ xem thử.
+## Kiểm tra và đăng bản mới
 
-Mã nguồn cũ được giữ ở nhánh `backup/truoc-web-quang-ba` và commit `e54261610c3c5ce9aa331129a7b579d9fba78094`.
+1. Chạy **QNU: Kiểm tra trước khi đăng** để ghép trang.
+2. Chạy **QNU: Kiểm tra chức năng** để kiểm tra bộ đếm và vuốt ảnh.
+3. Xem lại đầu trang, menu điện thoại, ba tab, ảnh và nhật ký.
+4. Khi muốn cập nhật công khai, Commit rồi Sync Changes lên nhánh production của kho GitHub. Vercel triển khai theo ../vercel.json; đợi Ready rồi kiểm tra website.
 
-## Ba hoạt động nằm ngay trên trang chủ
-- `noi-dung/03-hoat-dong.html`: lời dẫn, nút chuyển nhanh và các hoạt động khác.
-- `noi-dung/03a-mua-he-xanh.html`: toàn bộ ảnh, câu chuyện, lời mời Mùa hè xanh.
-- `noi-dung/03b-trung-thu-cho-em.html`: Trung thu cho em.
-- `noi-dung/03c-xuan-yeu-thuong.html`: Xuân yêu thương.
-Ba tệp trên được ghép vào trang chủ khi build. Các địa chỉ trang riêng cũ chỉ chuyển về đúng phần trên trang chủ. Giao diện hiện tại sửa ở cuối `giao-dien/styles.css`, mục BA HOẠT ĐỘNG TRÊN TRANG CHỦ.
+Dự án: dtntnqnu. Website: https://dtntnqnu.vercel.app. GitHub: https://github.com/sunrisepu0806/dtntnqnu.
 
-Số 2.523 lượt ủng hộ trước đây do Đội cung cấp sửa ở `noi-dung/01-dau-trang.html`, tách khỏi bộ đếm trực tiếp.
+**Không sửa dist/**: đây là bản tạo tự động, bị ghi lại mỗi lần build. Các thư mục app, components, lib ở cấp cha là ứng dụng cũ, không cần sửa để thay website quảng bá. Bản cũ đã có nhánh backup/truoc-web-quang-ba.
 
-## Tab và bộ xem ảnh
-`chuc-nang/programs.js` điều khiển 3 tab và bộ xem ảnh phóng lớn (Đóng, Ảnh trước, Ảnh sau). Mỗi hoạt động có 5 ảnh. Đổi ảnh trong tệp nội dung của hoạt động; không cần sửa JavaScript. Trên điện thoại bộ ảnh xếp một cột và giữ nguyên tỷ lệ.
+## Mã đã lọc khỏi bản website
 
-## Màu phân khu và vuốt ảnh
-- Sửa màu nền, đường phân chia và khoảng cách trong giao-dien/sections.css.
-- Vuốt ngang trên ảnh mở lớn để chuyển ảnh; chuc-nang/swipe.js bỏ qua chạm nhẹ, cuộn dọc và nhiều ngón.
-
-
-## Cỡ chữ và khoảng cách
-Sửa tại `giao-dien/readability.css`: chữ nội dung 16px, chú thích 14px, nhãn 13px; khoảng cách và bố cục cho điện thoại nằm cuối tệp. Tệp này được tải sau các CSS khác.
+chapters.js và campaign.css không còn được dùng; bản lưu nằm ở thư mục luu-tru-ma-khong-dung cạnh workspace. Các kiểu của dải thông tin trên cùng, nút Cùng tham gia ở header, hai liên kết đã bỏ và cơ chế ghim tiêu đề cũ đã được gỡ. Giữ các trang chuyển hướng cũ để liên kết đã chia sẻ vẫn hoạt động.

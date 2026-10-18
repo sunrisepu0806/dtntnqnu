@@ -1,0 +1,42 @@
+/* Theo mẫu tham khảo: đầu trang rộng, nút và số lượt tách ô, chân trang xanh đậm. */
+.header { padding-inline:4vw; }
+.hero.section { padding:32px 4vw 48px; gap:4%; align-items:start; }
+.hero-visual { padding-top:18px; }
+.hero h1 { font-size:clamp(40px,4.7vw,76px); }
+.hero-opening { border-left:3px solid #78a8e8; padding-left:18px; }
+.interest-panel.interest-combined { display:grid; grid-template-columns:auto minmax(0,1fr); gap:10px 12px; max-width:540px; border:0; border-radius:0; padding:0; background:none; }
+.interest-combined #interest-button { min-height:66px; padding:16px 24px; border-radius:0; gap:12px; box-shadow:none; }
+.interest-heart { width:24px; height:24px; flex-shrink:0; }
+.interest-combined #interest-button[aria-pressed=true] .interest-heart { fill:currentColor; }
+.interest-combined .interest-total { flex-direction:row; align-items:center; justify-content:center; gap:10px; padding:10px 16px; border:1px solid #9ebbe0; min-height:66px; }
+.interest-combined .interest-total strong { font-size:30px; line-height:1.2; }
+.interest-combined .interest-total > span { font-size:11px; font-weight:700; color:var(--blue-dark); line-height:1.5; }
+.interest-combined #interest-status { border:0; padding-top:3px; }
+.qnu-footer { background:linear-gradient(110deg,var(--footer-start),var(--footer-end)); color:#e1edff; padding:54px max(4vw,calc((100vw - 1500px)/2)) 26px; }
+.qnu-footer-grid { display:grid; grid-template-columns:1.3fr 1.3fr .75fr .8fr; gap:36px; }
+.qnu-footer .brand { align-items:center; white-space:normal; font-size:12px; line-height:1.6; }
+.qnu-footer .brand span { min-width:0; }.qnu-footer .brand strong { color:white; font-size:17px; }
+.qnu-footer .brand img { flex-shrink:0; }
+.qnu-footer h2 { font-size:15px; font-weight:700; text-transform:uppercase; color:white; letter-spacing:.015em; border-bottom:1px solid #ffffff1c; padding-bottom:14px; margin:0 0 12px; }
+.qnu-footer h2::before { content:''; display:inline-block; width:7px; height:7px; margin-right:10px; border-radius:50%; background:#53a5ff; vertical-align:middle; }
+.qnu-footer address { font-style:normal; }
+.qnu-footer p { color:#d3e2f3; font-size:14px; line-height:1.8; }
+.qnu-footer address p { margin-bottom:8px; }
+.qnu-footer address a,.qnu-footer nav a { display:block; font-size:14px; line-height:1.6; padding:7px 0; overflow-wrap:anywhere; }
+.qnu-footer a:hover { color:white; text-decoration:underline; text-underline-offset:4px; }
+.qnu-footer .footer-motto { margin:18px 0 22px; font-style:italic; }
+.footer-fanpage { display:inline-block; border:1px solid #ffffff20; border-radius:30px; background:#ffffff14; padding:10px 20px; font-size:14px; font-weight:600; }
+.qnu-footer-bottom { display:flex; justify-content:space-between; gap:16px; border-top:1px solid #ffffff1c; margin-top:44px; padding-top:24px; color:#a6c2df; font-size:13px; }
+@media(max-width:1100px) { .qnu-footer-grid { grid-template-columns:1fr 1fr; gap:32px; } }
+@media(max-width:760px) {
+  .header { padding-inline:16px; }.hero.section { padding:24px 16px 40px; gap:28px; }
+  .hero h1 { font-size:40px; }.hero-visual { padding-top:0; }
+  .interest-panel.interest-combined { grid-template-columns:auto minmax(0,1fr); gap:10px; }
+  .interest-combined #interest-button { padding:12px 14px; min-height:64px; font-size:14px; gap:8px; }
+  .interest-heart { width:20px; height:20px; }
+  .interest-combined .interest-total { flex-direction:column; gap:3px; padding:8px; min-height:64px; }
+  .interest-combined .interest-total strong { font-size:27px; }.interest-combined .interest-total > span { font-size:10px; }
+  .qnu-footer { padding:40px 20px 24px; }.qnu-footer-grid { grid-template-columns:1fr; gap:30px; }
+  .qnu-footer nav a,.qnu-footer address a { min-height:44px; padding-block:10px; }
+  .qnu-footer-bottom { flex-direction:column; margin-top:32px; }
+}

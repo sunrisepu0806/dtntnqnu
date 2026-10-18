@@ -1,29 +1,41 @@
-<section class="hero section" id="top">
-    <div class="hero-copy">
-      <p class="eyebrow"><span class="dot"></span> TUỔI TRẺ QNU · TÌNH NGUYỆN VÌ CỘNG ĐỒNG</p>
-      <h1>Kết nối sức trẻ.<br><em>Lan tỏa<br>yêu thương.</em></h1>
-      <p class="hero-description">Chúng mình là Đội Thanh Niên Tình Nguyện QNU, trực thuộc Hội Sinh viên Trường Đại học Quy Nhơn. Từ sân trường đến những chuyến đi vì cộng đồng, Đội kết nối những sinh viên sẵn lòng góp sức, cùng làm việc có ích và trưởng thành qua mỗi lần đồng hành.</p>
-      <div class="hero-actions"><a class="button primary" href="#hanh-trinh">Khám phá hành trình </a><a class="text-link" href="#ve-doi">Gặp gỡ chúng mình</a>
-</div>
-      <button class="motion-toggle" id="motion-toggle" type="button" aria-pressed="false" hidden>Bật hiệu ứng</button>
-      <aside class="past-support"><strong>2.523</strong> lượt ủng hộ trước đây<small>Số liệu do Đội cung cấp. Lượt Quan tâm mới trên website được ghi nhận riêng bên dưới.</small></aside>
-      <div class="interest-panel">
-        <button id="interest-button" type="button" aria-pressed="false" aria-describedby="interest-status"><span>Quan tâm</span></button>
-        <div>
-<div class="interest-number"><strong id="interest-count">—</strong> lượt quan tâm <i aria-hidden="true"></i>
-</div>
-<p id="interest-status" role="status">Đang kết nối bộ đếm…</p>
-</div>
+<!-- BA MÀN MỞ ĐẦU: mỗi nhịp cuộn chuyển nguyên màn hình. -->
+<section class="intro-stages" id="top" aria-label="Khám phá Đội qua ba màn mở đầu">
+  <div class="intro-pin">
+    <article class="intro-scene intro-dark intro-welcome" id="mo-dau" aria-labelledby="welcome-title">
+      <img class="intro-backdrop" src="/assets/team.jpg" alt="Tập thể Đội Thanh Niên Tình Nguyện QNU" fetchpriority="high">
+      <div class="intro-content">
+        <div class="intro-copy">
+          <p class="intro-kicker">ĐỘI THANH NIÊN TÌNH NGUYỆN QNU</p>
+          <h1 id="welcome-title">Kết nối sức trẻ.<br>Lan tỏa yêu thương.</h1>
+          <p class="intro-lead">Có những ngày tuổi trẻ đáng nhớ,<br>vì mình đã làm điều có ích cùng nhau.</p>
+          <p>Ở Đội Thanh Niên Tình Nguyện QNU, chúng mình gặp nhau qua những việc giản dị: chuẩn bị một món quà, mang niềm vui đến các em, góp sức sau cơn bão. Mỗi hành trình lại có thêm điều để học, người để thương và kỷ niệm để mang về.</p>
+      <div class="interest-panel interest-combined">
+        <button id="interest-button" type="button" data-base-count="2352" aria-pressed="false" aria-describedby="interest-status">
+          <svg class="interest-heart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/></svg>
+          <span class="interest-action">Quan tâm</span>
+        </button>
+        <div class="interest-total"><strong id="interest-count">2.352</strong><span>LƯỢT QUAN TÂM</span></div>
+        <p id="interest-status" role="status">2.352 lượt có sẵn · Đang tải lượt mới…</p>
       </div>
-    </div>
-    <div class="hero-visual">
-      <div class="photo-label">NHỮNG GƯƠNG MẶT, MỘT TINH THẦN CHUNG
-</div>
-      <img class="hero-team" src="/assets/team.jpg" alt="Tập thể Đội Thanh Niên Tình Nguyện QNU" fetchpriority="high">
-      <div class="hero-small"><img src="/assets/m6-trao-qua.jpg" alt="Trao quà đến bà con trong Mùa hè xanh 2026 tại thôn M6">
-<div><span>MÙA HÈ XANH 2026</span><strong>Góp một phần sức trẻ.<br>Gửi một phần yêu thương.</strong><a href="#mua-he-xanh">Chuyện ở M6</a>
-</div>
-</div>
-      <p class="image-credit">Khoảnh khắc thật từ fanpage Đội Thanh Niên Tình Nguyện QNU</p>
-    </div>
-  </section>
+
+        </div>
+      </div>
+      <div class="intro-bottom"><button type="button" data-intro-next>Cuộn để tiếp tục</button><a href="#hanh-trinh">Đến các hoạt động</a></div>
+    </article>
+    <article class="intro-scene intro-light" id="tinh-than-doi" aria-labelledby="spirit-title">
+      <div class="intro-content">
+        <div class="intro-copy"><p class="intro-kicker">CHÚNG MÌNH LÀ AI?</p><h2 id="spirit-title">Chung một tinh thần.<br>Cùng làm điều có ích.</h2><p class="intro-lead">Không cần bắt đầu bằng điều lớn lao. Chỉ cần sẵn lòng dành một phần thời gian và sức trẻ cho cộng đồng.</p><p>Đội trực thuộc Hội Sinh viên Trường Đại học Quy Nhơn, tiếp nối tinh thần sẵn sàng từ Đội Phản ứng nhanh của Trường.</p><a class="intro-link" href="#ve-doi">Tìm hiểu câu chuyện của Đội</a></div>
+        <aside class="intro-fact"><p class="intro-kicker">DẤU MỐC CỦA CHÚNG MÌNH</p><strong><span>27.04</span><span>2023</span></strong><h3>Ngày thành lập Đội</h3><p>Từ những người bạn cùng nhiệt huyết đến một tập thể cùng hành động, cùng sẻ chia.</p><span>ĐẠI HỌC QUY NHƠN</span></aside>
+      </div>
+      <div class="intro-bottom"><button type="button" data-intro-next>Cuộn để tiếp tục</button><a href="#hanh-trinh">Đến các hoạt động</a></div>
+    </article>
+    <article class="intro-scene intro-dark" id="nhung-mua-yeu-thuong" aria-labelledby="seasons-title">
+      <div class="intro-content">
+        <div class="intro-copy"><p class="intro-kicker">NHỮNG MÙA TÌNH NGUYỆN</p><h2 id="seasons-title">Đi để góp sức.<br>Về để nhớ thương.</h2><p class="intro-lead">Mùa hè xanh. Trung thu cho em. Xuân yêu thương.</p><p>Mỗi mùa một hành trình: góp sức cùng bà con, mang tiếng cười đến các em nhỏ, gửi một lời hỏi thăm ngày giáp Tết.</p><a class="intro-link" href="#hanh-trinh">Khám phá ảnh và câu chuyện</a></div>
+        <figure class="intro-photo"><img src="/assets/m6-trao-qua.jpg" alt="Trao quà đến bà con trong Mùa hè xanh 2026" loading="eager"><figcaption>Mùa hè xanh 2026 · Cùng bà con tại M6</figcaption></figure>
+      </div>
+      <div class="intro-bottom"><button type="button" data-intro-next>Khám phá tiếp về Đội</button><a href="#hanh-trinh">Đến các hoạt động</a></div>
+    </article>
+  </div>
+</section>
+<div class="intro-preferences"><button class="motion-toggle" id="motion-toggle" type="button" aria-pressed="false" hidden>Bật hiệu ứng</button></div>

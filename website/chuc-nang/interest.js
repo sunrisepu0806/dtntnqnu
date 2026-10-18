@@ -2,6 +2,8 @@
   const button = document.querySelector('#interest-button');
   const count = document.querySelector('#interest-count');
   const status = document.querySelector('#interest-status');
+  const baseCount = Number(button.dataset.baseCount || 0);
+  let loaded = false;
   let busy = false;
   let refreshTimer;
   // Mã này chỉ giúp nhận diện trình duyệt; số lượt luôn đọc từ máy chủ.
@@ -10,11 +12,13 @@
   if (!id || !/^[0-9a-f-]{36}$/i.test(id)) id = crypto.randomUUID();
   try { localStorage.setItem('qnu-visitor', id); } catch {}
   function display(data) {
-    count.textContent = new Intl.NumberFormat('vi-VN').format(data.count);
+    if (!Number.isSafeInteger(data.count) || data.count < 0) throw new Error('Invalid count');
+    loaded = true;
+    count.textContent = new Intl.NumberFormat('vi-VN').format(baseCount + data.count);
     button.disabled = data.interested;
     button.setAttribute('aria-pressed', String(data.interested));
-    button.querySelector('span').textContent = data.interested ? 'Đã quan tâm' : 'Quan tâm';
-    status.textContent = data.interested ? 'Cảm ơn bạn đã đồng hành cùng Đội!' : 'Lượt quan tâm trên website · cập nhật trực tiếp';
+    button.querySelector('.interest-action').textContent = data.interested ? 'Đã quan tâm' : 'Quan tâm';
+    status.textContent = data.interested ? 'Cảm ơn bạn đã đồng hành cùng Đội!' : 'Chạm để gửi sự quan tâm · Tổng lượt được cập nhật trực tiếp';
   }
   async function refresh() {
     if (document.hidden || busy) return;
@@ -22,7 +26,7 @@
       const response = await fetch('/api/interest', { cache: 'no-store' });
       if (!response.ok) throw new Error();
       display(await response.json());
-    } catch { status.textContent = 'Đang kết nối lại bộ đếm…'; }
+    } catch { status.textContent = loaded ? 'Đang kết nối lại · Hiển thị tổng cập nhật gần nhất.' : '2.352 lượt có sẵn · Chưa tải được lượt mới.'; }
   }
   button.addEventListener('click', async () => {
     if (busy) return;

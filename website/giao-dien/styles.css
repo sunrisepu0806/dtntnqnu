@@ -1,5 +1,5 @@
 /* MÀU CHỦ ĐẠO — đổi các biến này để thay màu toàn trang. */
-:root { --blue:#1260cf; --blue-dark:#13458b; --ink:#163451; --muted:#5c7188; --pale:#f0f6fd; --line:#dce7f3; --accent:#1260cf; }
+/* Các biến màu nằm trong 00-mau-sac.css. */
 * { box-sizing:border-box; }
 html { scroll-behavior:smooth; scroll-padding-top:100px; }
 body { margin:0; font-family:'Be Vietnam Pro',Arial,sans-serif; color:var(--ink); background:#fff; font-size:15px; line-height:1.8; }
@@ -17,14 +17,12 @@ em { color:var(--blue); font-style:normal; }
 a:focus-visible,button:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visible { outline:3px solid #60a5fa; outline-offset:5px; }
 .section { padding:90px max(6vw,calc((100vw - 1200px)/2)); }
 .skip { position:fixed; top:-100px; left:10px; z-index:100; padding:12px; background:#fff; }.skip:focus { top:10px; }
-.topline { background:var(--blue); color:#fff; padding:9px 6vw; font-size:10px; letter-spacing:.07em; display:flex; justify-content:space-between; }
 .header { position:sticky; top:0; z-index:20; padding:16px 6vw; display:flex; gap:30px; align-items:center; background:#fffffff5; backdrop-filter:blur(15px); border-bottom:1px solid var(--line); }
 .brand { display:flex; align-items:center; gap:12px; flex-shrink:0; line-height:1.45; font-size:14px; font-weight:500; }
 .brand img { border-radius:50%; width:56px; height:56px; object-fit:cover; }
 .brand strong { color:var(--blue); font-size:17px; }
 .header nav { display:flex; justify-content:center; gap:25px; flex:1; font-size:12px; font-weight:500; }
 .header nav a:hover,.text-link:hover { color:var(--blue); }
-.header-cta { border:1px solid var(--line); border-radius:50px; padding:9px 17px; color:var(--blue); font-size:12px; font-weight:600; }
 .menu-toggle { display:none; background:none; border:1px solid var(--line); border-radius:8px; color:var(--blue); padding:10px 12px; font-size:13px; font-weight:600; min-height:44px; }
 .hero { display:grid; grid-template-columns:1fr 1.03fr; gap:6%; padding-top:65px; padding-bottom:60px; background:linear-gradient(115deg,#fff 30%,#f0f7ff); align-items:center; }
 .eyebrow,.section-label { color:var(--blue); font-size:10px; font-weight:600; letter-spacing:.08em; }
@@ -56,9 +54,10 @@ a:focus-visible,button:focus-visible,summary:focus-visible,input:focus-visible,s
 .join { background:var(--blue); color:#fff; display:grid; grid-template-columns:1.25fr 1fr; gap:10%; }.join .section-label,.join .eyebrow { color:#badbff; }.join h2 { font-size:clamp(29px,3vw,42px); }.join em { color:#bcdcff; }.join>div>p:not(.section-label) { color:#e0edff; max-width:470px; font-size:14px; margin:25px 0; }.white { color:var(--blue); background:#fff; }.contact-card { font-style:normal; border-left:1px solid #ffffff40; padding-left:35px; align-self:center; }.contact-card h3 { font-size:24px; margin-bottom:25px; }.contact-card>div { margin-top:18px; }.contact-card span { display:block; color:#bbd8ff; font-size:11px; }.contact-card a { font-size:13px; overflow-wrap:anywhere; }.contact-card small { display:block; font-size:9px; color:#bbd8ff; margin-top:24px; }
 .faq-grid { display:grid; grid-template-columns:1fr 1.6fr; gap:8%; }.faq details { border-top:1px solid var(--line); padding:19px 0; }.faq summary { cursor:pointer; font-size:14px; font-weight:500; }.faq details p { font-size:13px; margin:17px 0 0; }
 footer.section { padding-top:35px; padding-bottom:25px; background:var(--pale); }.footer-top { display:flex; justify-content:space-between; align-items:center; gap:30px; }.footer-top p { font-size:12px; margin:0; }.footer-bottom { margin-top:30px; border-top:1px solid var(--line); padding-top:22px; display:flex; justify-content:space-between; gap:20px; font-size:9px; color:var(--muted); }
-@media(min-width:1550px) { .header,.topline { padding-left:calc((100vw - 1200px)/2); padding-right:calc((100vw - 1200px)/2); } }
-@media(max-width:1050px) { .header { gap:20px; }.header nav { gap:15px; font-size:11px; }.header-cta { display:none; }.hero { gap:5%; }.hero h1 { font-size:48px; }.hero-actions { gap:15px; flex-wrap:wrap; }.hero-small { gap:14px; }.hero-small strong { font-size:12px; }.featured-copy { padding:27px; }.about-grid { gap:6%; } }
-@media(max-width:760px) { html { scroll-padding-top:95px; }.section { padding:58px 6vw; }.topline { font-size:7px; }.topline span { display:none; }.header { padding:13px 6vw; justify-content:space-between; }.brand { font-size:12px; gap:10px; }.brand strong { font-size:14px; }.brand img { width:45px; height:45px; }.menu-toggle { display:block; }.header nav { display:none; position:absolute; top:100%; left:0; right:0; background:#fff; padding:18px 6vw; box-shadow:0 10px 20px #16345110; font-size:14px; }.header nav.open { display:flex; flex-direction:column; gap:20px; }.hero { grid-template-columns:1fr; gap:40px; padding-top:42px; }.hero h1 { font-size:50px; line-height:1.22; }.hero-description { font-size:14px; }.hero-visual { max-width:570px; }.hero-small strong { font-size:15px; }.eyebrow { font-size:9px; }.ribbon { font-size:8px; gap:14px; padding:16px 4vw; }.ribbon b { font-size:18px; }.ribbon span:last-child { max-width:120px; }.about-grid,.featured-campaign,.join,.faq-grid { grid-template-columns:1fr; gap:30px; }.departments { gap:25px; margin-top:35px; }.departments h3 { font-size:20px; }.departments p { font-size:12px; }.team-facts { padding:28px; }.section-heading { display:block; }.section-heading p { margin-top:20px; max-width:none; }.featured-photo img { aspect-ratio:1.5; }.featured-copy { padding:27px; }.featured-copy h3 { font-size:28px; }.story-grid { grid-template-columns:1fr; gap:28px; }.story-grid article { display:grid; grid-template-columns:40% 1fr; gap:20px; }.story-grid article>div { padding:0; }.story-grid h3 { font-size:18px; }.story-grid img { aspect-ratio:1; }.story-grid .eyebrow { font-size:8px; }.story-grid p { font-size:11px; margin:0; }.contact-card { border-left:0; border-top:1px solid #ffffff40; padding:28px 0 0; }.footer-top { flex-wrap:wrap; }.footer-top p { font-size:11px; }.footer-bottom { flex-direction:column; gap:7px; } }
+@media(min-width:1550px) {
+.header { padding-left:calc((100vw - 1200px)/2); padding-right:calc((100vw - 1200px)/2); } }
+@media(max-width:1050px) { .header { gap:20px; }.header nav { gap:15px; font-size:11px; }.hero { gap:5%; }.hero h1 { font-size:48px; }.hero-actions { gap:15px; flex-wrap:wrap; }.hero-small { gap:14px; }.hero-small strong { font-size:12px; }.featured-copy { padding:27px; }.about-grid { gap:6%; } }
+@media(max-width:760px) { html { scroll-padding-top:95px; }.section { padding:58px 6vw; }.header { padding:13px 6vw; justify-content:space-between; }.brand { font-size:12px; gap:10px; }.brand strong { font-size:14px; }.brand img { width:45px; height:45px; }.menu-toggle { display:block; }.header nav { display:none; position:absolute; top:100%; left:0; right:0; background:#fff; padding:18px 6vw; box-shadow:0 10px 20px #16345110; font-size:14px; }.header nav.open { display:flex; flex-direction:column; gap:20px; }.hero { grid-template-columns:1fr; gap:40px; padding-top:42px; }.hero h1 { font-size:50px; line-height:1.22; }.hero-description { font-size:14px; }.hero-visual { max-width:570px; }.hero-small strong { font-size:15px; }.eyebrow { font-size:9px; }.ribbon { font-size:8px; gap:14px; padding:16px 4vw; }.ribbon b { font-size:18px; }.ribbon span:last-child { max-width:120px; }.about-grid,.featured-campaign,.join,.faq-grid { grid-template-columns:1fr; gap:30px; }.departments { gap:25px; margin-top:35px; }.departments h3 { font-size:20px; }.departments p { font-size:12px; }.team-facts { padding:28px; }.section-heading { display:block; }.section-heading p { margin-top:20px; max-width:none; }.featured-photo img { aspect-ratio:1.5; }.featured-copy { padding:27px; }.featured-copy h3 { font-size:28px; }.story-grid { grid-template-columns:1fr; gap:28px; }.story-grid article { display:grid; grid-template-columns:40% 1fr; gap:20px; }.story-grid article>div { padding:0; }.story-grid h3 { font-size:18px; }.story-grid img { aspect-ratio:1; }.story-grid .eyebrow { font-size:8px; }.story-grid p { font-size:11px; margin:0; }.contact-card { border-left:0; border-top:1px solid #ffffff40; padding:28px 0 0; }.footer-top { flex-wrap:wrap; }.footer-top p { font-size:11px; }.footer-bottom { flex-direction:column; gap:7px; } }
 @media(max-width:390px) { .hero h1 { font-size:44px; }.departments { grid-template-columns:1fr; }.hero-small strong { font-size:12px; }.story-grid article { grid-template-columns:1fr; }.story-grid img { aspect-ratio:1.5; }#interest-status { font-size:8px; }.interest-panel { gap:10px; } }
 @media(prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } }
 /* Nhãn và danh mục bài viết trên màn hình hẹp. */
@@ -100,10 +99,10 @@ footer.section { padding-top:35px; padding-bottom:25px; background:var(--pale); 
 .reveal-pending { opacity:0; transform:translateY(24px); }
 .reveal-visible { animation:reveal-in .65s cubic-bezier(.2,.7,.2,1) both; animation-delay:var(--reveal-delay,0ms); }
 @keyframes reveal-in { from { opacity:0; transform:translateY(24px); } to { opacity:1; transform:translateY(0); } }
-.button,.header-cta,.activity-photo-card,.departments article,.invitation-reasons article { transition:transform .25s ease,box-shadow .25s ease; }
+.button,.activity-photo-card,.departments article,.invitation-reasons article { transition:transform .25s ease,box-shadow .25s ease; }
 .button span { display:inline-block; transition:transform .25s ease; }
 .button:hover span { transform:translate(3px,-3px); }
-.button:hover,.header-cta:hover { transform:translateY(-3px); box-shadow:0 10px 24px #1260cf26; }
+.button:hover { transform:translateY(-3px); box-shadow:0 10px 24px #1260cf26; }
 .activity-photo-card:focus-within { box-shadow:0 12px 30px #1260cf20; }
 @media(hover:hover) { .activity-photo-card:hover,.invitation-reasons article:hover { transform:translateY(-5px); box-shadow:0 16px 32px #1260cf16; }.activity-photo-card:hover img { transform:scale(1.045); } }
 .team-invitation { background:linear-gradient(135deg,#fff 15%,#eef6ff 100%); position:relative; overflow:hidden; }
@@ -115,7 +114,8 @@ footer.section { padding-top:35px; padding-bottom:25px; background:var(--pale); 
 .invitation-bottom { display:flex; justify-content:space-between; align-items:center; gap:24px; border-top:1px solid var(--line); padding-top:28px; }
 .invitation-bottom strong { font-size:16px; }.invitation-bottom p { font-size:10px; letter-spacing:.08em; margin:8px 0 0; color:var(--blue); }
 @media(max-width:760px) { .invitation-reasons { grid-template-columns:1fr; gap:16px; }.invitation-reasons article { padding:24px; }.invitation-reasons article>span { margin-bottom:16px; }.invitation-bottom { align-items:flex-start; flex-direction:column; } }
-@media(prefers-reduced-motion:reduce) { .reveal-pending { opacity:1; transform:none; }.reveal-visible { animation:none; }.button,.button span,.header-cta,.activity-photo-card,.activity-photo-link img,.departments article,.invitation-reasons article { transition:none; transform:none!important; } }
+@media(prefers-reduced-motion:reduce) { .reveal-pending { opacity:1; transform:none; }.reveal-visible { animation:none; }
+.button,.button span,.activity-photo-card,.activity-photo-link img,.departments article,.invitation-reasons article { transition:none; transform:none!important; } }
 .motion-toggle { color:var(--blue-dark); border:1px solid var(--line); border-radius:20px; background:#fff; padding:6px 14px; font-size:11px; cursor:pointer; margin-top:18px; }
 .motion-enabled .reveal-pending { opacity:0; transform:translateY(24px); }
 .motion-enabled .reveal-visible { animation:reveal-in .65s cubic-bezier(.2,.7,.2,1) both; animation-delay:var(--reveal-delay,0ms); }
@@ -137,8 +137,6 @@ footer.section { padding-top:35px; padding-bottom:25px; background:var(--pale); 
 .team-story-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:28px; }
 .team-story-grid h4 { font-size:16px; line-height:1.5; margin:0 0 12px; color:var(--blue-dark); }
 .team-story-grid p { font-size:13px; margin:0; }
-.team-source-links { display:flex; flex-wrap:wrap; gap:16px 28px; border-top:1px solid var(--line); padding-top:22px; margin-top:25px; }
-.team-source-links a { font-size:11px; }
 @media(max-width:760px) { .team-story { padding:24px; }.team-story-grid { grid-template-columns:1fr; gap:22px; }.team-story>h3 { font-size:24px; } }
 
 /* Hai trang hoạt động và số liệu ủng hộ trước đây. */
