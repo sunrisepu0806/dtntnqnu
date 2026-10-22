@@ -2,17 +2,15 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { logout } from '@/lib/logout';
 
 export default function AdminDonViMenu() {
-  const router = useRouter();
-
-  const handleLogout = () => {
-    document.cookie = 'access_token=; path=/; max-age=0; SameSite=Lax';
-    document.cookie = 'token=; path=/; max-age=0; SameSite=Lax';
-    localStorage.clear();
-    sessionStorage.clear();
-    router.replace('/');
+  const [loggingOut, setLoggingOut] = React.useState(false);
+  const handleLogout = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try { await logout(); }
+    catch { alert('Đăng xuất chưa thành công. Vui lòng thử lại.'); setLoggingOut(false); }
   };
 
   // Đường dẫn đã được cấu hình khớp với các thư mục trong ảnh
@@ -101,6 +99,7 @@ export default function AdminDonViMenu() {
           <button
             type="button"
             onClick={handleLogout}
+            disabled={loggingOut}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200/60 text-xs font-bold transition shadow-xs cursor-pointer"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">

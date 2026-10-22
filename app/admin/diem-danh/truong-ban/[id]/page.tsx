@@ -1,17 +1,18 @@
 "use client";
 
-import { useState, useEffect, useMemo, use } from "react";
+import { useState, useEffect, useMemo, useRef, use } from "react";
 import { 
+  query, where,
   collection, 
   onSnapshot, 
-  addDoc, 
-  doc, 
-  updateDoc, 
-  increment, 
-  serverTimestamp 
+doc, 
+increment, 
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import Link from "next/link";
+
+import BulkAttendance from "@/components/admin/BulkAttendance";
+import { RequestMemberTransfer } from "@/components/admin/MemberTransfer";
 
 interface Member {
   id: string;
@@ -52,8 +53,8 @@ function readAllowedSession(slug: string): Session | null {
     const session = value as Session;
     const role = normalize(session.role);
     if (role === "admin" || role === "quantrivien") return session;
-    if (role === "truongbansukien") return slug === "su-kien" ? session : null;
-    if (role === "truongbantruyenthong") return slug === "truyen-thong" ? session : null;
+    if (role === "truongbansukien") return session;
+    if (role === "truongbantruyenthong") return session;
     if (role !== "bantruong" && role !== "truongban") return null;
     const raw = session.ban_id ?? session.department ?? session.ban;
     const values = Array.isArray(raw) ? raw : [raw];
@@ -80,6 +81,7 @@ export default function TrangChiTietBan({
   const [members, setMembers] = useState<Member[]>([]);
   const [tasks, setTasks] = useState<TaskRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [exporting, setExporting] = useState(false);
   const [tuKhoa, setTuKhoa] = useState("");
 
@@ -99,6 +101,7 @@ export default function TrangChiTietBan({
   const [sanPham, setSanPham] = useState("");
   const [soBuoiCong, setSoBuoiCong] = useState(1);
   const [dangLuu, setDangLuu] = useState(false);
+  const awardRequestId = useRef<string | null>(null);
 
   useEffect(() => {
     setIsMounted(true);
@@ -121,7 +124,7 @@ export default function TrangChiTietBan({
       role: typeof session.role === "string" ? session.role : "",
       userDept: tenBan,
     });
-    const unsubUsers = onSnapshot(collection(db, "users"), (snap) => {
+    const applyUsers = (snap: { docs: { id: string; data: () => any }[] }) => {
       const list: Member[] = [];
       snap.docs.forEach((d) => {
         const data = d.data();
@@ -147,9 +150,9 @@ export default function TrangChiTietBan({
       });
       setMembers(list);
       setLoading(false);
-    });
+    };
 
-    const unsubTasks = onSnapshot(collection(db, "department_tasks"), (snap) => {
+    const applyTasks = (snap: { docs: { id: string; data: () => any }[] }) => {
       const list: TaskRecord[] = [];
       snap.docs.forEach((d) => {
         const data = d.data();
@@ -173,12 +176,31 @@ export default function TrangChiTietBan({
         }
       });
       setTasks(list.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0)));
-    });
-
-    return () => {
-      unsubUsers();
-      unsubTasks();
     };
+
+    const controller = new AbortController();
+    let inFlight = false;
+    let previous = "";
+    const load = async () => {
+      if (document.hidden || inFlight || controller.signal.aborted) return;
+      inFlight = true;
+      try {
+        const response = await fetch('/api/attendance/department-data?department=' + banSlug, { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(20000)]) });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error);
+        if (controller.signal.aborted) return;
+        const signature = JSON.stringify(result);
+        if (signature === previous) { setLoadError(""); return; }
+        previous = signature;
+        const snapshot = (rows: { id: string; data: any }[]) => ({ docs: rows.map(row => ({ id: row.id, data: () => row.data })) });
+        applyUsers(snapshot(result.users)); applyTasks(snapshot(result.tasks)); setLoadError("");
+      } catch (error) { if (!controller.signal.aborted) { setLoadError(error instanceof Error ? error.message : "Không tải được dữ liệu ban."); setLoading(false); } }
+      finally { inFlight = false; }
+    };
+    const refresh = () => { void load(); };
+    refresh(); const timer = setInterval(refresh, 30000);
+    document.addEventListener("visibilitychange", refresh);
+    return () => { controller.abort(); clearInterval(timer); document.removeEventListener("visibilitychange", refresh); };
   }, [banSlug, isSuKien, tenBan]);
 
   const danhSachLoc = useMemo(() => {
@@ -194,6 +216,7 @@ export default function TrangChiTietBan({
 
   const handleMoModal = (member: Member) => {
     if (checkedSlug !== banSlug || !readAllowedSession(banSlug)) return;
+    awardRequestId.current = crypto.randomUUID();
     setSelectedMember(member);
     setCongViec("");
     setSanPham("");
@@ -216,28 +239,16 @@ export default function TrangChiTietBan({
 
     setDangLuu(true);
     try {
-      await addDoc(collection(db, "department_tasks"), {
-        studentId: selectedMember.studentId,
-        memberName: selectedMember.fullName,
-        department: tenBan,
-        taskName: loaiNhiemVu,
-        workDescription: congViec.trim(),
-        productLink: sanPham.trim(),
-        pointsAdded: Number(soBuoiCong) || 1,
-        approvedBy: `${currentUser.name} (${currentUser.mssv})`,
-        timestamp: serverTimestamp(),
+      const response = await fetch("/api/attendance/award", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requestId: awardRequestId.current, memberId: selectedMember.id, points: soBuoiCong, taskName: loaiNhiemVu,
+          workDescription: congViec.trim(), productLink: sanPham.trim() }),
       });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Không thể cộng buổi.");
 
-      const cleanSid = selectedMember.studentId.toLowerCase();
-      await updateDoc(doc(db, "users", cleanSid), {
-        soBuoiDiemDanh: increment(Number(soBuoiCong) || 1),
-      }).catch(async () => {
-        await updateDoc(doc(db, "users", selectedMember.id), {
-          soBuoiDiemDanh: increment(Number(soBuoiCong) || 1),
-        }).catch(() => {});
-      });
-
-      alert(`Đã cộng +${soBuoiCong} buổi cho thành viên ${selectedMember.fullName}!`);
+      alert(result.pendingApproval ? "Đã gửi đề nghị — Chờ admin duyệt. Chưa cộng buổi." : `Đã cộng +${soBuoiCong} buổi cho thành viên ${selectedMember.fullName}!`);
+      window.dispatchEvent(new Event("attendance-requests-changed"));
       setIsModalCong(false);
     } catch (err: any) {
       alert("Lỗi khi lưu dữ liệu: " + err.message);
@@ -471,6 +482,10 @@ export default function TrangChiTietBan({
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 mt-6 space-y-4">
+        <div className="flex flex-wrap gap-3"><Link className="rounded-xl border px-3 py-2 text-sm font-semibold text-sky-700" href={`/admin/diem-danh/truong-ban/${isSuKien ? "truyen-thong" : "su-kien"}`}>Chuyển sang ban {isSuKien ? "Truyền thông" : "Sự kiện"}</Link></div>
+        <BulkAttendance />
+        <Link href="/admin/duyet-diem-danh" className="inline-flex rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800">Xem danh sách gửi duyệt →</Link>
+        {loadError && <p role="alert" className="text-red-700">{loadError}</p>}
         <div className="bg-white border border-slate-300 rounded-2xl p-3.5 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="w-full sm:flex-1 relative">
             <input
@@ -498,7 +513,10 @@ export default function TrangChiTietBan({
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
+        <div className="space-y-3 md:hidden">
+          {loading ? <p>Đang tải danh sách…</p> : !danhSachLoc.length ? <p>Không có thành viên phù hợp.</p> : danhSachLoc.map(m=><article key={m.id} className="space-y-3 rounded-2xl border bg-white p-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><h2 className="break-words font-bold">{m.fullName}</h2><p className="mt-1 font-mono text-sm text-sky-700">{m.studentId}</p></div><span className="shrink-0 text-sm font-semibold text-emerald-700">{m.soBuoiDiemDanh} buổi</span></div><p className="text-sm text-slate-600">{m.specialty} · {m.group}</p><button type="button" onClick={()=>handleMoModal(m)} className="min-h-11 w-full rounded-xl bg-sky-600 px-4 py-3 text-sm font-semibold text-white">{currentUser.role === "Quản trị viên" ? "+ Cộng buổi" : "Gửi duyệt"}</button><RequestMemberTransfer id={m.id} name={m.fullName}/></article>)}
+        </div>
+        <div className="hidden md:block bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse whitespace-nowrap">
               <thead>
@@ -548,8 +566,9 @@ export default function TrangChiTietBan({
                           onClick={() => handleMoModal(m)}
                           className="px-3.5 py-1.5 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] text-white font-bold text-xs transition cursor-pointer shadow-xs"
                         >
-                          + Cộng Buổi
+                          {currentUser.role === "Quản trị viên" ? "+ Cộng Buổi" : "Gửi duyệt"}
                         </button>
+                        <RequestMemberTransfer id={m.id} name={m.fullName}/>
                       </td>
                     </tr>
                   ))
@@ -562,11 +581,11 @@ export default function TrangChiTietBan({
 
       {isModalCong && selectedMember && (
         <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-lg p-6 sm:p-7 rounded-3xl border border-slate-200 shadow-2xl">
+          <div className="bg-white w-full max-w-lg max-h-[90dvh] overflow-y-auto p-4 sm:p-7 rounded-3xl border border-slate-200 shadow-2xl">
             <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-100">
               <div>
                 <h3 className="text-base font-bold text-slate-900 uppercase">
-                  Cộng Buổi Điểm Danh Ban {tenBan}
+                  {currentUser.role === "Quản trị viên" ? "Cộng buổi" : "Đề nghị điểm danh"} Ban {tenBan}
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
                   Thành viên: <strong className="text-slate-900">{selectedMember.fullName}</strong> ({selectedMember.studentId})
@@ -666,7 +685,7 @@ export default function TrangChiTietBan({
                   disabled={dangLuu}
                   className="flex-1 py-2.5 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] text-white font-bold transition uppercase cursor-pointer disabled:opacity-60"
                 >
-                  {dangLuu ? "Đang ghi nhận..." : "Xác Nhận Cộng Buổi"}
+                  {dangLuu ? "Đang gửi..." : currentUser.role === "Quản trị viên" ? "Xác nhận cộng buổi" : "Gửi admin duyệt"}
                 </button>
               </div>
             </form>

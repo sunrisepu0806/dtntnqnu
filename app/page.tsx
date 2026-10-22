@@ -2,8 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { signInWithPopup } from "firebase/auth";
-import { auth, googleProvider } from "@/lib/firebase";
+import { connectFirebaseSession } from "@/lib/firebase-session";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -18,21 +17,6 @@ export default function LoginPage() {
   useEffect(() => {
     setMounted(true);
   }, []);
-
-  const handlePasswordChange = (val: string) => {
-    const sanitized = val
-      .replace(/!/g, "1")
-      .replace(/@/g, "2")
-      .replace(/#/g, "3")
-      .replace(/\$/g, "4")
-      .replace(/%/g, "5")
-      .replace(/\^/g, "6")
-      .replace(/&/g, "7")
-      .replace(/\*/g, "8")
-      .replace(/\(/g, "9")
-      .replace(/\)/g, "0");
-    setPassword(sanitized);
-  };
 
   const dieuHuongTheoVaiTro = (user: any, serverRedirectUrl?: string) => {
     if (user) {
@@ -69,36 +53,18 @@ export default function LoginPage() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mssv: mssv.trim(), password }),
+        body: JSON.stringify({ mssv: mssv.trim(), password, rememberMe }),
       });
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Đăng nhập không thành công");
 
-      dieuHuongTheoVaiTro(data.user, data.redirectUrl);
-    } catch (err: any) {
-      setErrorMsg(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleGoogleLogin = async () => {
-    setLoading(true);
-    setErrorMsg("");
-    try {
-      const result = await signInWithPopup(auth, googleProvider);
-      const email = result.user.email;
-
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Email chưa được liên kết với hồ sơ nào");
-
+      try {
+        await connectFirebaseSession(data.customToken);
+      } catch {
+        await fetch("/api/auth/logout", { method: "POST" });
+        throw new Error("Chưa kết nối được Firebase. Vui lòng kiểm tra cấu hình và đăng nhập lại.");
+      }
       dieuHuongTheoVaiTro(data.user, data.redirectUrl);
     } catch (err: any) {
       setErrorMsg(err.message);
@@ -159,7 +125,7 @@ export default function LoginPage() {
                 Đăng nhập
               </h1>
               <p className="mt-1 text-xs text-slate-500">
-                Nhập mã số sinh viên hoặc liên kết bằng tài khoản Google
+                Nhập mã số sinh viên và mật khẩu để đăng nhập
               </p>
             </div>
 
@@ -196,9 +162,9 @@ export default function LoginPage() {
                     suppressHydrationWarning
                     type={showPassword ? "text" : "password"}
                     required
-                    autoComplete="new-password"
+                    autoComplete="current-password"
                     value={password}
-                    onChange={(e) => handlePasswordChange(e.target.value)}
+                    onChange={(e) => setPassword(e.target.value)}
                     placeholder="Nhập mật khẩu"
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 pr-14 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0284c7] focus:bg-white transition"
                   />
@@ -236,28 +202,7 @@ export default function LoginPage() {
               </div>
             </form>
 
-            <div className="relative flex py-4 items-center">
-              <div className="flex-grow border-t border-slate-200" />
-              <span className="flex-shrink mx-4 text-[10px] uppercase font-bold tracking-widest text-slate-400">
-                Hoặc
-              </span>
-              <div className="flex-grow border-t border-slate-200" />
-            </div>
 
-            <button
-              type="button"
-              onClick={handleGoogleLogin}
-              disabled={loading}
-              className="w-full flex items-center justify-center gap-3 py-2.5 px-4 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-semibold transition disabled:opacity-50 cursor-pointer"
-            >
-              <svg className="w-4 h-4" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
-                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
-              </svg>
-              Liên kết bằng Google Workspace
-            </button>
 
           </div>
         </div>

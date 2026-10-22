@@ -16,11 +16,13 @@ interface Member {
 interface AttendanceRecord {
   studentId: string;
   timestamp?: any;
+  points: number;
 }
 
 export default function AdminDashboardTongQuan() {
   const [members, setMembers] = useState<Member[]>([]);
   const [attendances, setAttendances] = useState<AttendanceRecord[]>([]);
+  const [departmentTasks, setDepartmentTasks] = useState<AttendanceRecord[]>([]);
   const [totalEvents, setTotalEvents] = useState(0);
   const [loading, setLoading] = useState(true);
 
@@ -51,7 +53,7 @@ export default function AdminDashboardTongQuan() {
           studentId: String(data.mssv || data.studentId || d.id).trim(),
           group: matchTo ? matchTo[0] : "",
           department: dept,
-          sessions: Number(data.soBuoiDiemDanh || data.totalSessions || 0),
+          sessions: Number(data.soBuoiDiemDanh ?? data.totalSessions ?? 0),
         });
       });
 
@@ -67,13 +69,21 @@ export default function AdminDashboardTongQuan() {
         list.push({
           studentId: String(data.studentId || data.mssv || "").trim().toLowerCase(),
           timestamp: data.timestamp || data.createdAt || data.date,
+          points: 1,
         });
       });
       setAttendances(list);
     });
 
     // 3. Tải danh sách sự kiện
-    const unsubEvents = onSnapshot(collection(db, "events"), (snap) => {
+    const unsubTasks = onSnapshot(collection(db, "department_tasks"), (snap) => {
+      setDepartmentTasks(snap.docs.map((document) => {
+        const data = document.data();
+        return { studentId: String(data.studentId || data.mssv || "").trim().toLowerCase(),
+          timestamp: data.timestamp || data.createdAt || data.date, points: Number(data.pointsAdded || 0) };
+      }));
+    });
+    const unsubEvents = onSnapshot(collection(db, "activities"), (snap) => {
       setTotalEvents(snap.size);
     });
 
@@ -81,6 +91,7 @@ export default function AdminDashboardTongQuan() {
       unsubUsers();
       unsubAtt();
       unsubEvents();
+      unsubTasks();
     };
   }, []);
 
@@ -97,20 +108,16 @@ export default function AdminDashboardTongQuan() {
 
   // TÍNH ĐIỂM DANH THEO BỘ LỌC
   const attendanceFilteredMap = useMemo(() => {
-    if (attendances.length === 0) return null;
+    // All-time totals retain initial/imported balances as well as awarded work.
+    if (filterTime === "all") return null;
 
     const map: Record<string, number> = {};
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
 
-    attendances.forEach((record) => {
+    [...attendances, ...departmentTasks].forEach((record) => {
       if (!record.studentId) return;
-
-      if (filterTime === "all") {
-        map[record.studentId] = (map[record.studentId] || 0) + 1;
-        return;
-      }
 
       const recDate = parseRecordDate(record.timestamp);
       if (!recDate) {
@@ -122,26 +129,23 @@ export default function AdminDashboardTongQuan() {
 
       if (filterTime === "this_month") {
         if (rMonth === currentMonth && rYear === currentYear) {
-          map[record.studentId] = (map[record.studentId] || 0) + 1;
+          map[record.studentId] = (map[record.studentId] || 0) + record.points;
         }
       } else if (filterTime === "last_month") {
         const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1;
         const lastYear = currentMonth === 0 ? currentYear - 1 : currentYear;
         if (rMonth === lastMonth && rYear === lastYear) {
-          map[record.studentId] = (map[record.studentId] || 0) + 1;
+          map[record.studentId] = (map[record.studentId] || 0) + record.points;
         }
       }
     });
 
     return map;
-  }, [attendances, filterTime]);
+  }, [attendances, departmentTasks, filterTime]);
 
   // SỐ LIỆU TỔNG QUAN
   const tongSoThanhVien = members.length;
-  const tongLuotDiemDanh =
-    attendances.length > 0
-      ? attendances.length
-      : members.reduce((sum, m) => sum + m.sessions, 0);
+  const tongLuotDiemDanh = members.reduce((sum, m) => sum + m.sessions, 0);
 
   // DỮ LIỆU BIỂU ĐỒ BAN CHUYÊN MÔN
   const soSuKien = members.filter((m) => m.department === "Sự kiện").length;

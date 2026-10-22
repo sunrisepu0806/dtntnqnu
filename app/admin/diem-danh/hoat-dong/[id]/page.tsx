@@ -7,15 +7,10 @@ import {
   onSnapshot, 
   query, 
   where,
-  addDoc,
-  deleteDoc,
-  updateDoc,
-  increment,
-  serverTimestamp
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import * as XLSX from "xlsx";
 import Link from "next/link";
+import BulkAttendance from "@/components/admin/BulkAttendance";
 
 interface Activity {
   id: string;
@@ -217,25 +212,17 @@ export default function TrangChiTietHoatDong({
 
     setDangThem(true);
     try {
-      await addDoc(collection(db, "attendance"), {
-        activityId: activityId,
-        activityName: activity?.name || "Hoạt động",
-        studentId: mssvCanThem.trim(),
-        memberName: tenThanhVien,
-        scannerName: currentUser.name,
-        scannerMssv: currentUser.mssv,
-        timestamp: serverTimestamp(),
+      if (!profile) throw new Error("MSSV chưa có trong danh sách thành viên.");
+      const response = await fetch("/api/attendance/manual", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ activityId, memberId: profile.id }),
       });
-
-      await updateDoc(doc(db, "users", cleanSid), {
-        soBuoiDiemDanh: increment(1),
-      }).catch(async () => {
-        if (profile?.id) {
-          await updateDoc(doc(db, "users", profile.id), {
-            soBuoiDiemDanh: increment(1),
-          }).catch(() => {});
-        }
-      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Không thể thêm điểm danh.");
+      if (result.alreadyCheckedIn) {
+        alert("Thành viên đã được điểm danh trong hoạt động này.");
+        return;
+      }
 
       alert(`Đã thêm thành công thành viên: ${tenThanhVien}`);
       setMssvCanThem("");
@@ -254,20 +241,12 @@ export default function TrangChiTietHoatDong({
     }
 
     try {
-      await deleteDoc(doc(db, "attendance", item.id));
-
-      const cleanSid = item.studentId.trim().toLowerCase();
-      const profile = usersMap.get(cleanSid);
-
-      await updateDoc(doc(db, "users", cleanSid), {
-        soBuoiDiemDanh: increment(-1),
-      }).catch(async () => {
-        if (profile?.id) {
-          await updateDoc(doc(db, "users", profile.id), {
-            soBuoiDiemDanh: increment(-1),
-          }).catch(() => {});
-        }
+      const response = await fetch("/api/attendance/manual", {
+        method: "DELETE", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ attendanceId: item.id }),
       });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Không thể xóa điểm danh.");
 
       alert(`Đã xóa thành viên ${item.memberName} khỏi hoạt động`);
     } catch (err: any) {
@@ -276,12 +255,14 @@ export default function TrangChiTietHoatDong({
   };
 
   // Xuất file Excel danh sách toàn bộ hoạt động (Đầy đủ Ngành/Lớp, Tổ 1, 2, 3...)
-  const xuatFileExcelHoatDong = () => {
+  const xuatFileExcelHoatDong = async () => {
     if (attendanceList.length === 0) {
       alert("Chưa có thành viên nào điểm danh hoạt động này!");
       return;
     }
 
+    const XLSX = await import("xlsx").catch(() => null);
+    if (!XLSX) { alert("Không tải được công cụ xuất Excel. Vui lòng thử lại."); return; }
     const dataExport = attendanceList.map((item, idx) => {
       const profile = usersMap.get(item.studentId.toLowerCase());
       return {
@@ -378,6 +359,7 @@ export default function TrangChiTietHoatDong({
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 mt-6 space-y-4">
+        <BulkAttendance activityId={activityId} />
         {/* THANH TÌM KIẾM ĐƯỢC THIẾT KẾ LẠI: CÂN ĐỐI, RÕ RÀNG, KHÔNG BỊ CẮT VIỀN */}
         <div className="bg-white border border-slate-200 rounded-2xl p-3 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="w-full sm:flex-1">

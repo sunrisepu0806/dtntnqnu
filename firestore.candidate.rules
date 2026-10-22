@@ -1,0 +1,101 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function session() {
+      return get(/databases/$(database)/documents/web_sessions/$(request.auth.uid)).data;
+    }
+    function account() {
+      return get(/databases/$(database)/documents/admin_accounts/$(session().accountId)).data;
+    }
+    function signedIn() {
+      return request.auth != null
+        && session().expiresAt > request.time
+        && account().get('disabled', false) == false
+        && account().authVersion == session().authVersion
+        && account().role == session().role;
+    }
+    function admin() { return signedIn() && session().role == 'Quản trị viên'; }
+    function scanner() { return signedIn() && session().role == 'Quét mã'; }
+    function groupLeader() { return signedIn() && session().role == 'Tổ trưởng'; }
+    function departmentLeader() {
+      return signedIn() && session().role in ['Trưởng ban Sự kiện', 'Trưởng ban Truyền thông'];
+    }
+    function canReadMember() {
+      return admin() || scanner()
+        || (groupLeader() && resource.data.accessGroup == session().group)
+        || (departmentLeader() && resource.data.accessDepartment == session().department);
+    }
+    function safeMember() {
+      return !request.resource.data.keys().hasAny(['password', 'passwork', 'passwordHash'])
+        && request.resource.data.accessGroup in ['', '1', '2', '3', '4', '5']
+        && request.resource.data.accessDepartment in ['', 'su-kien', 'truyen-thong'];
+    }
+    // Credentials and session authorization can only be accessed by the server.
+    match /admin_accounts/{id} { allow read, write: if false; }
+    match /web_sessions/{id} { allow read, write: if false; }
+    match /user/{id} { allow read, write: if false; }
+    match /users/{id} {
+      allow read: if canReadMember();
+      allow create, update: if admin() && safeMember();
+      allow delete: if admin();
+    }
+    match /members/{id} {
+      allow read: if canReadMember();
+      allow create, update: if admin() && safeMember();
+      allow delete: if admin();
+    }
+    match /activities/{id} {
+      allow read: if signedIn();
+      allow write: if admin();
+    }
+    match /attendance/{id} {
+      allow read: if admin() || scanner() || (groupLeader() && resource.data.accessGroup == session().group);
+      // Scanner writes go through an atomic, authenticated server operation.
+      allow write: if admin();
+    }
+    match /department_tasks/{id} {
+      allow read: if admin() || (departmentLeader() && resource.data.accessDepartment == session().department);
+      allow write: if admin();
+    }
+    match /group_checklist_defs/{id} {
+      allow read: if admin() || groupLeader();
+      allow write: if admin();
+    }
+    match /group_checklists/{id} {
+      allow read, write: if admin() || (groupLeader() && id == 'to_' + session().group);
+    }
+    // The separate public site reads these collections directly.
+    match /posts_activities/{id} { allow read: if true; allow write: if admin(); }
+    match /locations/{id} { allow read: if true; allow write: if admin(); }
+    match /activity_forms/{id} { allow read: if true; allow write: if admin(); }
+    match /events/{id} { allow read: if true; allow write: if admin(); }
+    match /certificates/{id} { allow read: if true; allow write: if admin(); }
+    // Existing public activity pages count registrations via a direct collection read.
+    // Keep that contract; a separate public-site migration is needed to expose counts only.
+    match /activity_registrations/{id} {
+      allow read: if true;
+      allow create: if request.resource.data.keys().hasOnly([
+          'answers', 'activityTitle', 'activityId', 'fullName', 'studentId', 'group', 'major', 'dob', 'registeredAt'
+        ]) && request.resource.data.activityId is string
+        && request.resource.data.studentId is string
+        && request.resource.data.fullName is string
+        && get(/databases/$(database)/documents/activity_forms/$(request.resource.data.activityId)).data.isOpen == true;
+      allow update, delete: if admin();
+    }
+    match /{counter}/{id} {
+      allow read: if counter in ['qnu_website_counters', 'qnu_website_preview_counters'];
+      allow create: if counter in ['qnu_website_counters', 'qnu_website_preview_counters']
+        && request.resource.data.keys().hasOnly(['count']) && request.resource.data.count == 1;
+      allow update: if counter in ['qnu_website_counters', 'qnu_website_preview_counters']
+        && request.resource.data.keys().hasOnly(['count']) && request.resource.data.count == resource.data.count + 1;
+    }
+    match /{collection}/{id} {
+      allow read, write: if admin() && collection in [
+        'events', 'certificates', 'locations', 'posts_activities', 'activity_forms',
+        'activity_registrations', 'registrations'
+      ];
+    }
+    // Unknown collections remain closed; specific public contracts are listed above.
+    match /{document=**} { allow read, write: if false; }
+  }
+}

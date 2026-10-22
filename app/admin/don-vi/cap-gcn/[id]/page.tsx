@@ -4,7 +4,6 @@ import React, { useState, useEffect, useMemo, use, useRef } from 'react';
 import Link from 'next/link';
 import { doc, getDoc, collection, onSnapshot, writeBatch, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import ExcelJS from 'exceljs';
 
 interface CertItem {
   id: string;
@@ -84,7 +83,8 @@ export default function ChiTietCapGCNToiUu({
 
   // Tải file mẫu .xlsx
   const handleDownloadSample = async () => {
-    const workbook = new ExcelJS.Workbook();
+    const ExcelJS = (await import("exceljs")).default;
+      const workbook = new ExcelJS.Workbook();
     const ws = workbook.addWorksheet('GCN_Sample');
 
     ws.columns = [
@@ -121,6 +121,7 @@ export default function ChiTietCapGCNToiUu({
 
     setFileName(file.name);
     try {
+      const ExcelJS = (await import("exceljs")).default;
       const workbook = new ExcelJS.Workbook();
       const buffer = await file.arrayBuffer();
       await workbook.xlsx.load(buffer);

@@ -1,0 +1,20 @@
+require('@next/env').loadEnvConfig(process.cwd());
+const fs=require('node:fs');
+const {initializeApp,cert}=require('firebase-admin/app');
+const {getFirestore}=require('firebase-admin/firestore');
+const {getSecurityRules}=require('firebase-admin/security-rules');
+const {load}=require('../tests/helpers.cjs');
+const permissions=load('lib/permissions.ts');
+const {accountUser}=load('lib/server-session.ts',{'server-only':{},'next/headers':{},'@/lib/firebase-admin':{},'@/lib/permissions':permissions,'@/lib/session-token':{}});
+(async()=>{
+ const app=initializeApp({credential:cert(process.env.GOOGLE_APPLICATION_CREDENTIALS)});
+ const snap=await getFirestore(app).collection('admin_accounts').select('name','fullName','hoTen','mssv','username','role','to_id','to','group','ban_id','disabled').get();
+ const routes=['/admin/phan-quyen','/admin/diem-danh','/admin/diem-danh/quet-ma',...['1','2','3','4','5'].map(i=>'/admin/diem-danh/to-truong/'+i),...['su-kien','truyen-thong'].map(i=>'/admin/diem-danh/truong-ban/'+i)];
+ const rows=snap.docs.map(d=>{const v=d.data();const u=accountUser(d.id,v);return {id:d.id,username:v.username||'',name:v.name||v.fullName||v.hoTen||'',mssv:v.mssv||'',role:v.role||'',group:v.to_id||v.to||v.group||'',ban:v.ban_id||null,disabled:v.disabled===true,valid:!!u,canApprove:!!u&&v.disabled!==true&&u.role==='Quản trị viên',routes:u&&v.disabled!==true?routes.filter(p=>permissions.canAccess(u,p)):[]};});
+ const rules=await getSecurityRules(app).getFirestoreRuleset();
+ const published=rules.source.map(s=>s.content).join('\n');
+ const local=fs.readFileSync('firestore.candidate.rules','utf8');
+ const report={checkedAt:new Date().toISOString(),accounts:rows,rulesMatchLocal:published.replace(/\r\n/g,'\n').trim()===local.replace(/\r\n/g,'\n').trim(),publishedRulesName:rules.name};
+ fs.mkdirSync('audit',{recursive:true});fs.writeFileSync('audit/account-permissions.json',JSON.stringify(report,null,2));
+ console.log(JSON.stringify(report,null,2));
+})().then(()=>process.exit(0)).catch(e=>{console.error(e.message);process.exit(1)});

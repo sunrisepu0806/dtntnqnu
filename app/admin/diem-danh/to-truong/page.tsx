@@ -66,13 +66,6 @@ export default function TrangQuanLyToAdmin() {
 
     // 1. Tải danh sách thành viên thuộc 5 Tổ
     const unsubUsers = onSnapshot(collection(db, "users"), (snap) => {
-      if (snap.empty) {
-        const unsubFallback = onSnapshot(collection(db, "members"), (memSnap) => {
-          setMembers(parseDocs(memSnap.docs));
-          setLoading(false);
-        });
-        return () => unsubFallback();
-      }
       setMembers(parseDocs(snap.docs));
       setLoading(false);
     });

@@ -1,16 +1,6 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { db } from "@/lib/firebase";
-import {
-  collection,
-  deleteDoc,
-  doc,
-  onSnapshot,
-  serverTimestamp,
-  setDoc,
-  updateDoc,
-} from "firebase/firestore";
 import Link from "next/link";
 
 export type VaiTroType = "Quản trị viên" | "Tổ trưởng" | "Trưởng ban Sự kiện" | "Trưởng ban Truyền thông" | "Quét mã";
@@ -32,7 +22,15 @@ const DANH_SACH_ROLE: VaiTroType[] = [
   "Trưởng ban Truyền thông",
   "Quét mã",
 ];
-const COLLECTION_TAI_KHOAN = "admin_accounts";
+async function accountRequest(method: string, body?: unknown) {
+  const response = await fetch("/api/admin/accounts", {
+    method, cache: "no-store", headers: { "Content-Type": "application/json" },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error || "Không thể xử lý tài khoản.");
+  return result;
+}
 
 const taoPhamViTheoVaiTro = (role: VaiTroType, toId?: TaiKhoan["to_id"]) => {
   const phamVi: Pick<TaiKhoan, "to_id" | "ban_id"> = {};
@@ -70,58 +68,16 @@ export default function TrangPhanQuyen() {
   const [dangTai, setDangTai] = useState(true);
   const [dangLuu, setDangLuu] = useState(false);
 
-  const chuanHoaChuoi = (val: unknown) =>
-    String(val || "")
-      .trim()
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/đ/g, "d")
-      .replace(/[\s_-]+/g, "");
-
-  // KIỂM TRA BẢO MẬT: CHỈ DUY NHẤT QUẢN TRỊ VIÊN ĐƯỢC PHÉP
-  const checkAdmin = (): boolean => {
-    if (typeof window === "undefined") return false;
-
-    try {
-      const raw = localStorage.getItem("user_session");
-      if (!raw) return false;
-      const session = JSON.parse(raw);
-
-      // Cờ trực tiếp
-      if (session.isAdmin === true || session.is_admin === true || session.admin === true) {
-        return true;
-      }
-
-      // Vai trò Quản trị viên
-      const rawRole = String(session.role || session.vaiTro || session.type || "").trim();
-      const r = chuanHoaChuoi(rawRole);
-
-      return ["admin", "quantrivien", "administrator", "quantri"].includes(r);
-    } catch {
-      return false;
-    }
-  };
-
   useEffect(() => {
-    const refresh = () => {
-      const isOk = checkAdmin();
-      setAllowed(isOk);
-
-      try {
-        const raw = localStorage.getItem("user_session");
-        if (raw) {
-          const session = JSON.parse(raw);
-          setSelfMssv(String(session?.mssv || session?.studentId || "").trim());
-        }
-      } catch {
-        setSelfMssv("");
-      }
-    };
-
-    refresh();
-    window.addEventListener("storage", refresh);
-    return () => window.removeEventListener("storage", refresh);
+    let active = true;
+    fetch("/api/auth/session", { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Phiên đăng nhập không hợp lệ");
+        const { user } = await response.json();
+        if (active) { setAllowed(user.role === "Quản trị viên"); setSelfMssv(user.mssv); }
+      })
+      .catch(() => { if (active) setAllowed(false); });
+    return () => { active = false; };
   }, []);
 
   const [danhSach, setDanhSach] = useState<TaiKhoan[]>([]);
@@ -154,31 +110,23 @@ export default function TrangPhanQuyen() {
     setTimeout(() => setThongBao(null), 3000);
   };
 
+  const loadAccounts = async () => {
+    const { accounts } = await accountRequest("GET");
+    setDanhSach(accounts.map((item: Record<string, unknown>) => docThanhTaiKhoan(String(item.mssv), item))
+      .sort((a: TaiKhoan, b: TaiKhoan) => a.name.localeCompare(b.name, "vi")));
+  };
+
   useEffect(() => {
-    if (!allowed) {
-      setDangTai(false);
-      setDanhSach([]);
-      return;
-    }
-
-    setDangTai(true);
-    const unsubscribe = onSnapshot(
-      collection(db, COLLECTION_TAI_KHOAN),
-      (snapshot) => {
-        setDanhSach(
-          snapshot.docs
-            .map((item) => docThanhTaiKhoan(item.id, item.data() as Record<string, unknown>))
-            .sort((a, b) => a.name.localeCompare(b.name, "vi"))
-        );
-        setDangTai(false);
-      },
-      (error) => {
-        console.error("Lỗi:", error);
-        setDangTai(false);
-      }
-    );
-
-    return () => unsubscribe();
+    if (!allowed) return;
+    let active = true;
+    accountRequest("GET")
+      .then(({ accounts }) => {
+        if (active) setDanhSach(accounts.map((item: Record<string, unknown>) => docThanhTaiKhoan(String(item.mssv), item))
+          .sort((a: TaiKhoan, b: TaiKhoan) => a.name.localeCompare(b.name, "vi")));
+      })
+      .catch(() => { if (active) setThongBao("Không thể tải danh sách tài khoản."); })
+      .finally(() => { if (active) setDangTai(false); });
+    return () => { active = false; };
   }, [allowed]);
 
   const xuLyThemTaiKhoan = async (e: React.FormEvent) => {
@@ -204,11 +152,8 @@ export default function TrangPhanQuyen() {
 
     try {
       setDangLuu(true);
-      await setDoc(doc(db, COLLECTION_TAI_KHOAN, taiKhoanMoi.mssv), {
-        ...taiKhoanMoi,
-        updatedAt: serverTimestamp(),
-        createdAt: serverTimestamp(),
-      });
+      await accountRequest("POST", taiKhoanMoi);
+      await loadAccounts();
       setFormThem({
         mssv: "",
         name: "",
@@ -219,7 +164,7 @@ export default function TrangPhanQuyen() {
       });
       setTabHienTai("DANH_SACH");
       baoToast(`Đã cấp quyền [${taiKhoanMoi.role}] cho MSSV ${taiKhoanMoi.mssv}`);
-    } catch (error) {
+    } catch {
       baoToast("Không tạo được tài khoản trên Firebase.");
     } finally {
       setDangLuu(false);
@@ -238,10 +183,11 @@ export default function TrangPhanQuyen() {
     }
     try {
       setDangLuu(true);
-      await deleteDoc(doc(db, COLLECTION_TAI_KHOAN, taiKhoanXoa.mssv));
+      await accountRequest("DELETE", { mssv: taiKhoanXoa.mssv });
+      await loadAccounts();
       baoToast(`Đã xóa tài khoản ${taiKhoanXoa.mssv}`);
       setTaiKhoanXoa(null);
-    } catch (error) {
+    } catch {
       baoToast("Lỗi khi xóa tài khoản.");
     } finally {
       setDangLuu(false);
@@ -264,10 +210,6 @@ export default function TrangPhanQuyen() {
       baoToast("Vui lòng chọn tổ phụ trách.");
       return;
     }
-    if (!taiKhoanChinhSua.password.trim()) {
-      baoToast("Mật khẩu không được để trống.");
-      return;
-    }
     const phamVi = taoPhamViTheoVaiTro(taiKhoanChinhSua.role, taiKhoanChinhSua.to_id);
     const duLieuCapNhat: TaiKhoan = {
       ...taiKhoanChinhSua,
@@ -277,17 +219,11 @@ export default function TrangPhanQuyen() {
 
     try {
       setDangLuu(true);
-      await updateDoc(doc(db, COLLECTION_TAI_KHOAN, duLieuCapNhat.mssv), {
-        name: duLieuCapNhat.name.trim(),
-        password: duLieuCapNhat.password,
-        role: duLieuCapNhat.role,
-        to_id: duLieuCapNhat.to_id || "",
-        ban_id: duLieuCapNhat.ban_id || "",
-        updatedAt: serverTimestamp(),
-      });
+      await accountRequest("PATCH", duLieuCapNhat);
+      await loadAccounts();
       baoToast(`Đã cập nhật thông tin MSSV ${duLieuCapNhat.mssv}`);
       setTaiKhoanChinhSua(null);
-    } catch (error) {
+    } catch {
       baoToast("Lỗi cập nhật tài khoản.");
     } finally {
       setDangLuu(false);
@@ -690,6 +626,7 @@ export default function TrangPhanQuyen() {
               <input
                 type="password"
                 value={taiKhoanChinhSua.password}
+                placeholder="Để trống để giữ mật khẩu hiện tại"
                 onChange={(e) =>
                   setTaiKhoanChinhSua({
                     ...taiKhoanChinhSua,

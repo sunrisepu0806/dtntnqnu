@@ -1,11 +1,18 @@
 "use client";
+import { memberGroup, memberDepartment } from "@/lib/member-scope";
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import * as XLSX from "xlsx";
-import ExcelJS from "exceljs";
+
 import QRCode from "qrcode";
-import { collection, onSnapshot, setDoc, doc, serverTimestamp } from "firebase/firestore";
+import {
+  collection,
+  onSnapshot,
+  doc,
+  writeBatch,
+  getDocs,
+  serverTimestamp,
+} from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 export interface Member {
@@ -15,7 +22,7 @@ export interface Member {
   majorAndClass: string;
   department: string;
   group: string;
-  specialty: string; // Mảng chuyên môn
+  specialty: string;
   dob: string;
   avatarUrl?: string;
   totalSessions: number;
@@ -55,10 +62,20 @@ const formatDobString = (dob: any) => {
 const normalizeDepartment = (val: any): string => {
   if (!val) return "";
   const str = String(val).trim().toLowerCase();
-  if (str.includes("truyền thông") || str.includes("tt") || str.includes("media") || str.includes("bantruyenthong")) {
+  if (
+    str.includes("truyền thông") ||
+    str.includes("tt") ||
+    str.includes("media") ||
+    str.includes("bantruyenthong")
+  ) {
     return "Truyền thông";
   }
-  if (str.includes("sự kiện") || str.includes("sk") || str.includes("event") || str.includes("bansukien")) {
+  if (
+    str.includes("sự kiện") ||
+    str.includes("sk") ||
+    str.includes("event") ||
+    str.includes("bansukien")
+  ) {
     return "Sự kiện";
   }
   return String(val).trim();
@@ -92,6 +109,7 @@ export default function TrangCongCuThanhVien() {
 
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [thongBao, setThongBao] = useState<string | null>(null);
 
   const [exportGroupSelect, setExportGroupSelect] = useState("1");
@@ -140,7 +158,10 @@ export default function TrangCongCuThanhVien() {
           dept = normalizeDepartment(m.department || m.ban || m.ban_id);
         }
 
-        const specialty = m.mangChuyenMon || m.specialty || (dept === "Sự kiện" ? "Hậu cần" : "Chụp ảnh");
+        const specialty =
+          m.mangChuyenMon ||
+          m.specialty ||
+          (dept === "Sự kiện" ? "Hậu cần" : "Chụp ảnh");
 
         list.push({
           id: docSnap.id,
@@ -171,9 +192,10 @@ export default function TrangCongCuThanhVien() {
     };
   }, []);
 
-  // 1. Tải file mẫu Excel có sẵn cột Mảng Chuyên Môn
+  // 1. Tải file mẫu Excel
   const downloadTemplate = async () => {
     try {
+      const ExcelJS = (await import("exceljs")).default;
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet("Mau_Nhap_Lieu");
 
@@ -213,19 +235,21 @@ export default function TrangCongCuThanhVien() {
       });
 
       const buffer = await workbook.xlsx.writeBuffer();
-      const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=utf-8" });
+      const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=utf-8",
+      });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
       a.download = "Mau_Nhap_Thanh_Vien_QNU.xlsx";
       a.click();
-      setThongBao("Đã tải xuống file mẫu Excel (đầy đủ cột Mảng chuyên môn) thành công!");
+      setThongBao("Đã tải xuống file mẫu Excel thành công!");
     } catch (e) {
       alert("Lỗi khi tạo file mẫu");
     }
   };
 
-  // 2. Nhập file Excel và đọc trường Mảng Chuyên Môn
+  // 2. Nhập file Excel: MSSV là key cố định, cập nhật mọi thông tin khác, không chạm số buổi
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -236,9 +260,18 @@ export default function TrangCongCuThanhVien() {
       reader.onload = async (event) => {
         try {
           const data = new Uint8Array(event.target?.result as ArrayBuffer);
-          const workbook = XLSX.read(data, { type: "array", codepage: 65001, cellDates: true });
+          const XLSX = await import("xlsx");
+          const workbook = XLSX.read(data, {
+            type: "array",
+            codepage: 65001,
+            cellDates: true,
+          });
           const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-          const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet, { defval: "", raw: false, dateNF: "DD/MM/YYYY" });
+          const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet, {
+            defval: "",
+            raw: false,
+            dateNF: "DD/MM/YYYY",
+          });
 
           if (!jsonData || jsonData.length === 0) {
             alert("Tệp Excel rỗng!");
@@ -246,9 +279,16 @@ export default function TrangCongCuThanhVien() {
             return;
           }
 
-          let successCount = 0;
+          let insertedCount = 0;
+          let updatedCount = 0;
           let errorCount = 0;
-          const currentIds = new Set(members.map((m) => cleanId(m.studentId)));
+
+          const processedInFile = new Set<string>();
+          const existingIds = new Set(members.map((m) => cleanId(m.studentId)));
+
+          const BATCH_SIZE = 450;
+          let batch = writeBatch(db);
+          let opCount = 0;
 
           for (const row of jsonData) {
             const normRow: any = {};
@@ -256,52 +296,80 @@ export default function TrangCongCuThanhVien() {
               normRow[k.toString().trim().toLowerCase().replace(/\s+/g, " ")] = row[k];
             });
 
-            const fullName = normRow["họ và tên"] || normRow["họ tên"] || normRow["fullname"] || "";
-            const studentId = normRow["mã sinh viên"] || normRow["mã sv"] || normRow["mssv"] || "";
-            const majorAndClass = normRow["ngành / lớp"] || normRow["ngành"] || "Chưa cập nhật";
+            const fullName =
+              normRow["họ và tên"] || normRow["họ tên"] || normRow["fullname"] || "";
+            const studentId =
+              normRow["mã sinh viên"] || normRow["mã sv"] || normRow["mssv"] || "";
+            const majorAndClass =
+              normRow["ngành / lớp"] || normRow["ngành"] || "Chưa cập nhật";
             const department = normalizeDepartment(normRow["ban"] || normRow["department"]);
-            
-            // Đọc trường mảng từ nhiều kiểu viết khác nhau
-            const specialty = 
-              normRow["mảng chuyên môn"] || 
-              normRow["mảng"] || 
-              normRow["mang chuyen mon"] || 
-              normRow["mang"] || 
-              normRow["specialty"] || 
+
+            const specialty =
+              normRow["mảng chuyên môn"] ||
+              normRow["mảng"] ||
+              normRow["mang chuyen mon"] ||
+              normRow["mang"] ||
+              normRow["specialty"] ||
               (department === "Truyền thông" ? "Chụp ảnh" : "Hậu cần");
 
             const group = normalizeGroup(normRow["tổ"] || normRow["group"]);
             const dob = normRow["ngày sinh"] || normRow["dob"] || "";
-            const avatarUrl = convertDriveToDirectLink(normRow["link ảnh"] || normRow["avatar"] || "");
+            const avatarUrl = convertDriveToDirectLink(
+              normRow["link ảnh"] || normRow["avatar"] || ""
+            );
 
             const cleanSid = cleanId(studentId);
-            if (!fullName || !cleanSid || currentIds.has(cleanSid)) {
+
+            if (!fullName || !cleanSid || processedInFile.has(cleanSid)) {
               errorCount++;
               continue;
             }
+            processedInFile.add(cleanSid);
 
-            currentIds.add(cleanSid);
+            const isExisting = existingIds.has(cleanSid);
 
-            await setDoc(doc(db, "users", cleanSid), {
+            const memberData: any = {
               mssv: String(studentId).trim(),
               name: String(fullName).trim(),
               majorAndClass: String(majorAndClass).trim(),
-              passwork: "12345",
-              role: "Thành viên",
+              accessGroup: memberGroup(group),
+              accessDepartment: memberDepartment(department),
               to_id: group === "TNV" ? "tnv" : `to_${group}`,
               ban_id: department === "Truyền thông" ? ["bantruyenthong"] : ["bansukien"],
               mangChuyenMon: String(specialty).trim(),
               ngaySinh: formatDobString(dob),
               linkDriveAnh: String(avatarUrl).trim(),
-              soBuoiDiemDanh: 0,
-              createdAt: serverTimestamp(),
-            });
-            successCount++;
+              updatedAt: serverTimestamp(),
+            };
+
+            if (!isExisting) {
+              memberData.soBuoiDiemDanh = 0;
+              memberData.createdAt = serverTimestamp();
+              insertedCount++;
+            } else {
+              updatedCount++;
+            }
+
+            const docRef = doc(db, "users", cleanSid);
+            batch.set(docRef, memberData, { merge: true });
+            opCount++;
+
+            if (opCount >= BATCH_SIZE) {
+              await batch.commit();
+              batch = writeBatch(db);
+              opCount = 0;
+            }
           }
 
-          setThongBao(`Nhập thành công: ${successCount} thành viên (Bỏ qua/Trùng: ${errorCount})`);
+          if (opCount > 0) {
+            await batch.commit();
+          }
+
+          setThongBao(
+            `Đã xử lý: Cập nhật ${updatedCount} thành viên, Thêm mới ${insertedCount} thành viên (Bỏ qua/Trùng trong file: ${errorCount})`
+          );
         } catch (err) {
-          alert("Lỗi khi đọc file Excel");
+          alert("Lỗi khi đọc hoặc đồng bộ file Excel");
         } finally {
           setImporting(false);
           if (fileInputRef.current) fileInputRef.current.value = "";
@@ -314,12 +382,115 @@ export default function TrangCongCuThanhVien() {
     }
   };
 
-  // 3. Xuất file tùy chọn có Mảng và mã QR hình ảnh.
+  // 3. Xóa tất cả các buổi điểm danh (Reset số buổi về 0 & dọn dẹp collection attendance)
+  const handleResetAttendance = async () => {
+    const confirmAction = window.confirm(
+      "CẢNH BÁO: Thao tác này sẽ xóa toàn bộ lịch sử điểm danh và đặt số buổi điểm danh của TẤT CẢ thành viên về 0.\n\nBạn có chắc chắn muốn thực hiện?"
+    );
+    if (!confirmAction) return;
+
+    setIsDeleting(true);
+    try {
+      // Xóa collection attendance
+      const attSnap = await getDocs(collection(db, "attendance"));
+      let batch = writeBatch(db);
+      let opCount = 0;
+
+      for (const attDoc of attSnap.docs) {
+        batch.delete(doc(db, "attendance", attDoc.id));
+        opCount++;
+        if (opCount >= 450) {
+          await batch.commit();
+          batch = writeBatch(db);
+          opCount = 0;
+        }
+      }
+
+      // Đặt lại soBuoiDiemDanh = 0 cho tất cả users
+      const usersSnap = await getDocs(collection(db, "users"));
+      for (const uDoc of usersSnap.docs) {
+        batch.update(doc(db, "users", uDoc.id), {
+          soBuoiDiemDanh: 0,
+          updatedAt: serverTimestamp(),
+        });
+        opCount++;
+        if (opCount >= 450) {
+          await batch.commit();
+          batch = writeBatch(db);
+          opCount = 0;
+        }
+      }
+
+      if (opCount > 0) {
+        await batch.commit();
+      }
+
+      setThongBao("Đã reset toàn bộ số buổi điểm danh về 0 thành công!");
+    } catch (error: any) {
+      alert("Lỗi khi reset điểm danh: " + error.message);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  // 4. Xóa toàn bộ danh sách thành viên (users) và lịch sử điểm danh tương ứng
+  const handleDeleteAllMembers = async () => {
+    const confirmName = window.prompt(
+      "CỰC KỲ NGUY HIỂM: Bạn đang chuẩn bị xóa TOÀN BỘ thành viên khỏi hệ thống!\nNhập chữ 'XOA HET' vào bên dưới để xác nhận:"
+    );
+    if (confirmName !== "XOA HET") {
+      if (confirmName !== null) alert("Mã xác nhận không đúng. Đã hủy thao tác.");
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      let batch = writeBatch(db);
+      let opCount = 0;
+
+      // Xóa toàn bộ users
+      const usersSnap = await getDocs(collection(db, "users"));
+      for (const uDoc of usersSnap.docs) {
+        batch.delete(doc(db, "users", uDoc.id));
+        opCount++;
+        if (opCount >= 450) {
+          await batch.commit();
+          batch = writeBatch(db);
+          opCount = 0;
+        }
+      }
+
+      // Xóa luôn attendance liên quan để tránh rác dữ liệu
+      const attSnap = await getDocs(collection(db, "attendance"));
+      for (const attDoc of attSnap.docs) {
+        batch.delete(doc(db, "attendance", attDoc.id));
+        opCount++;
+        if (opCount >= 450) {
+          await batch.commit();
+          batch = writeBatch(db);
+          opCount = 0;
+        }
+      }
+
+      if (opCount > 0) {
+        await batch.commit();
+      }
+
+      setThongBao("Đã xóa toàn bộ danh sách thành viên và điểm danh!");
+    } catch (error: any) {
+      alert("Lỗi khi xóa thành viên: " + error.message);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  // 5. Xuất file tùy chọn có Mảng và mã QR
   const executeCustomExport = async (dataToExport: Member[], fileName: string) => {
     setExporting(true);
     await new Promise((resolve) => setTimeout(resolve, 150));
 
     try {
+      const ExcelJS = (await import("exceljs")).default;
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet("DanhSach");
       const cols: any[] = [];
@@ -375,7 +546,9 @@ export default function TrangCongCuThanhVien() {
       }
 
       const buffer = await workbook.xlsx.writeBuffer();
-      const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=utf-8" });
+      const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=utf-8",
+      });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -389,7 +562,7 @@ export default function TrangCongCuThanhVien() {
     }
   };
 
-  // 4. Xuất theo Tổ kèm Mảng và sheet lịch sử hoạt động.
+  // 6. Xuất theo Tổ kèm Mảng và sheet lịch sử
   const handleExportByGroup = async (group: string) => {
     setExporting(true);
     await new Promise((resolve) => setTimeout(resolve, 150));
@@ -404,6 +577,7 @@ export default function TrangCongCuThanhVien() {
         return;
       }
 
+      const ExcelJS = (await import("exceljs")).default;
       const workbook = new ExcelJS.Workbook();
       const summarySheetName = `Tổng Hợp ${groupLabel}`.substring(0, 31);
       const summaryWs = workbook.addWorksheet(summarySheetName);
@@ -441,7 +615,9 @@ export default function TrangCongCuThanhVien() {
       sheetNames.add(summarySheetName);
 
       groupMembers.forEach((member, index) => {
-        const safeName = (member.studentId || `TV_${index}`).replace(/[\\/?*[\]:]/g, "_").substring(0, 27);
+        const safeName = (member.studentId || `TV_${index}`)
+          .replace(/[\\/?*[\]:]/g, "_")
+          .substring(0, 27);
         let finalSheetName = safeName;
         let counter = 1;
 
@@ -476,7 +652,9 @@ export default function TrangCongCuThanhVien() {
         ws.getRow(11).font = { bold: true, color: { argb: "FF0055A5" } };
 
         const sid = cleanId(member.studentId);
-        const myAtt = attendanceRecords.filter((a) => cleanId(a.studentId) === sid || a.memberId === member.id);
+        const myAtt = attendanceRecords.filter(
+          (a) => cleanId(a.studentId) === sid || a.memberId === member.id
+        );
         myAtt.forEach((att) => {
           const act = activities.find((a) => a.id === att.activityId);
           ws.addRow([
@@ -488,7 +666,9 @@ export default function TrangCongCuThanhVien() {
       });
 
       const buffer = await workbook.xlsx.writeBuffer();
-      const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=utf-8" });
+      const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=utf-8",
+      });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -502,7 +682,7 @@ export default function TrangCongCuThanhVien() {
     }
   };
 
-  // 5. Xuất theo Ban.
+  // 7. Xuất theo Ban
   const handleExportByDepartment = async (dept: string) => {
     setExporting(true);
     await new Promise((resolve) => setTimeout(resolve, 150));
@@ -535,7 +715,11 @@ export default function TrangCongCuThanhVien() {
       {thongBao && (
         <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center justify-between shadow-xs">
           <span>{thongBao}</span>
-          <button type="button" onClick={() => setThongBao(null)} className="cursor-pointer">
+          <button
+            type="button"
+            onClick={() => setThongBao(null)}
+            className="cursor-pointer"
+          >
             Đóng
           </button>
         </div>
@@ -574,7 +758,7 @@ export default function TrangCongCuThanhVien() {
             onClick={downloadTemplate}
             className="w-full py-2.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-[#0284c7] text-xs font-bold transition border border-sky-200 cursor-pointer"
           >
-            Tải File Mẫu Excel 
+            Tải File Mẫu Excel
           </button>
         </div>
 
@@ -582,11 +766,11 @@ export default function TrangCongCuThanhVien() {
           <div>
             <h4 className="text-sm font-bold text-slate-900">2. Nhập Dữ Liệu Hàng Loạt</h4>
             <p className="text-xs text-slate-500 mt-1">
-              Tải tệp Excel đã điền thông tin để ghi thẳng vào hệ thống Firebase (bao gồm cả mảng chuyên môn).
+              MSSV là mã định danh cố định. Cập nhật mọi thông tin cá nhân mới và giữ nguyên số buổi điểm danh.
             </p>
           </div>
           <label className="w-full py-2.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold transition border border-indigo-200 cursor-pointer text-center block">
-            {importing ? "Đang đọc dữ liệu..." : "Chọn Tệp Excel Để Nhập"}
+            {importing ? "Đang đồng bộ dữ liệu..." : "Chọn Tệp Excel Để Nhập"}
             <input
               type="file"
               accept=".xlsx, .xls"
@@ -612,12 +796,19 @@ export default function TrangCongCuThanhVien() {
             </span>
             <div className="grid grid-cols-2 gap-2">
               {Object.entries(exportOptions).map(([key, value]) => (
-                <label key={key} className="flex items-center justify-between p-2 bg-white rounded-lg border border-slate-200 cursor-pointer">
-                  <span className="font-semibold text-slate-700">{EXPORT_LABELS[key] || key}</span>
+                <label
+                  key={key}
+                  className="flex items-center justify-between p-2 bg-white rounded-lg border border-slate-200 cursor-pointer"
+                >
+                  <span className="font-semibold text-slate-700">
+                    {EXPORT_LABELS[key] || key}
+                  </span>
                   <input
                     type="checkbox"
                     checked={value}
-                    onChange={(e) => setExportOptions({ ...exportOptions, [key]: e.target.checked })}
+                    onChange={(e) =>
+                      setExportOptions({ ...exportOptions, [key]: e.target.checked })
+                    }
                     className="w-3.5 h-3.5 accent-[#0284c7]"
                   />
                 </label>
@@ -710,7 +901,9 @@ export default function TrangCongCuThanhVien() {
                     .map((id) => cleanId(id))
                     .filter((id) => id.length > 0);
 
-                  const matchMems = members.filter((m) => ids.includes(cleanId(m.studentId)));
+                  const matchMems = members.filter((m) =>
+                    ids.includes(cleanId(m.studentId))
+                  );
                   if (matchMems.length === 0) {
                     alert("Không tìm thấy mã sinh viên nào khớp!");
                     return;
@@ -722,6 +915,58 @@ export default function TrangCongCuThanhVien() {
                 Xuất Danh Sách MSSV Đã Nhập
               </button>
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* KHỐI 3: QUẢN TRỊ DỌN DẸP DỮ LIỆU (DANGER ZONE) */}
+      <div className="bg-rose-50/40 border border-rose-200 rounded-3xl p-6 shadow-xs space-y-4">
+        <div>
+          <h3 className="text-sm font-bold text-rose-800 uppercase tracking-tight flex items-center gap-2">
+            <span>⚠️</span> Vùng Quản Trị & Đặt Lại Dữ Liệu
+          </h3>
+          <p className="text-xs text-rose-600 mt-1">
+            Các thao tác tại khu vực này có tính chất xóa vĩnh viễn trên cơ sở dữ liệu Firestore. Hãy cân nhắc cẩn thận trước khi ấn.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+          <div className="bg-white border border-rose-200 p-4 rounded-2xl flex flex-col justify-between space-y-3">
+            <div>
+              <h4 className="text-xs font-bold text-slate-800">
+                1. Reset Tất Cả Buổi Điểm Danh
+              </h4>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Xóa sạch collection điểm danh và đặt lại số buổi điểm danh của toàn bộ thành viên về 0 (giữ nguyên danh sách người).
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled={isDeleting}
+              onClick={handleResetAttendance}
+              className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition uppercase cursor-pointer disabled:opacity-50 shadow-xs"
+            >
+              {isDeleting ? "Đang xử lý..." : "Reset Toàn Bộ Điểm Danh Về 0"}
+            </button>
+          </div>
+
+          <div className="bg-white border border-rose-200 p-4 rounded-2xl flex flex-col justify-between space-y-3">
+            <div>
+              <h4 className="text-xs font-bold text-rose-700">
+                2. Xóa Toàn Bộ Thành Viên
+              </h4>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Xóa sạch toàn bộ danh sách thành viên trong hệ thống và dọn dẹp các lịch sử điểm danh liên quan.
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled={isDeleting}
+              onClick={handleDeleteAllMembers}
+              className="w-full py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition uppercase cursor-pointer disabled:opacity-50 shadow-xs"
+            >
+              {isDeleting ? "Đang xử lý..." : "Xóa Tất Cả Thành Viên"}
+            </button>
           </div>
         </div>
       </div>

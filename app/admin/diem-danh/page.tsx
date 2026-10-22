@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+
 import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
@@ -35,7 +36,7 @@ export default function BangDieuPhoiDiemDanh() {
       }));
     });
 
-    const unsubEvents = onSnapshot(collection(db, "events"), (snap) => {
+    const unsubEvents = onSnapshot(collection(db, "activities"), (snap) => {
       setThongKe((prev) => ({
         ...prev,
         tongSuKien: snap.size,
@@ -107,6 +108,7 @@ export default function BangDieuPhoiDiemDanh() {
         </Link>
       </div>
 
+      <Link href="/admin/duyet-diem-danh" className="inline-flex rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800">Xem danh sách gửi duyệt →</Link>
       {/* 3 CHỈ SỐ THỐNG KÊ (DÀN NGANG GỌN GÀNG) */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex items-center justify-between">
@@ -147,7 +149,7 @@ export default function BangDieuPhoiDiemDanh() {
             </p>
           </div>
           <span className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-100 text-[11px] font-black uppercase">
-            Lượt quét
+            Buổi ghi nhận (hoạt động + ban)
           </span>
         </div>
       </div>

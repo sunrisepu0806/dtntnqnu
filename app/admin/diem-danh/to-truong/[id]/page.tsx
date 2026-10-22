@@ -1,10 +1,13 @@
 "use client";
 
 import { useState, useEffect, useMemo, use } from "react";
-import { collection, doc, onSnapshot, setDoc } from "firebase/firestore";
+import { collection, doc, onSnapshot, setDoc, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import ExcelJS from "exceljs";
 import Link from "next/link";
+
+import BulkAttendance from "@/components/admin/BulkAttendance";
+import { RequestMemberRemoval } from "@/components/admin/MemberRemoval";
+import { RequestMemberTransfer } from "@/components/admin/MemberTransfer";
 
 interface Member {
   id: string;
@@ -13,6 +16,7 @@ interface Member {
   group: string;
   department: string;
   majorAndClass: string;
+  totalSessions?: number;
 }
 
 interface Activity {
@@ -123,7 +127,6 @@ export default function TrangChiTietTo({
       setLoading(false);
     };
 
-    let unsubFallback: (() => void) | undefined;
 
     const parseDocs = (docs: any[]) => {
       const list: Member[] = [];
@@ -155,6 +158,7 @@ export default function TrangChiTietTo({
                 : "Sự kiện"
               : data.department || data.ban || "Chưa xếp ban",
             majorAndClass: majorStr,
+            totalSessions: typeof data.soBuoiDiemDanh === "number" ? data.soBuoiDiemDanh : undefined,
           });
         }
       });
@@ -163,21 +167,8 @@ export default function TrangChiTietTo({
 
     // 1. Tải danh sách thành viên Tổ
     const unsubUsers = onSnapshot(
-      collection(db, "users"),
+      query(collection(db, "users"), where("accessGroup", "==", String(toId))),
       (snap) => {
-        unsubFallback?.();
-        unsubFallback = undefined;
-        if (snap.empty) {
-          unsubFallback = onSnapshot(
-            collection(db, "members"),
-            (memSnap) => {
-              setMembers(parseDocs(memSnap.docs));
-              setLoading(false);
-            },
-            onError
-          );
-          return;
-        }
         setMembers(parseDocs(snap.docs));
         setLoading(false);
       },
@@ -197,7 +188,7 @@ export default function TrangChiTietTo({
     });
 
     // 3. Tải lượt điểm danh
-    const unsubAtt = onSnapshot(collection(db, "attendance"), (snap) => {
+    const unsubAtt = onSnapshot(query(collection(db, "attendance"), where("accessGroup", "==", String(toId))), (snap) => {
       setAttendanceRecords(
         snap.docs.map((d) => ({
           activityId: d.data().activityId,
@@ -222,7 +213,6 @@ export default function TrangChiTietTo({
     });
 
     return () => {
-      unsubFallback?.();
       unsubUsers();
       unsubActs();
       unsubAtt();
@@ -286,6 +276,7 @@ export default function TrangChiTietTo({
     await new Promise((resolve) => setTimeout(resolve, 150));
 
     try {
+      const ExcelJS = (await import("exceljs")).default;
       const workbook = new ExcelJS.Workbook();
       const summarySheetName = `Tong_Hop_To_${toId}`;
       const summaryWs = workbook.addWorksheet(summarySheetName);
@@ -311,7 +302,7 @@ export default function TrangChiTietTo({
 
       members.forEach((m, idx) => {
         const sid = m.studentId.toLowerCase();
-        const totalSessions = countAttMap[sid] || 0;
+        const totalSessions = m.totalSessions ?? countAttMap[sid] ?? 0;
 
         const row = summaryWs.addRow({
           stt: idx + 1,
@@ -360,10 +351,10 @@ export default function TrangChiTietTo({
         ws.addRow(["Ngành / Lớp:", member.majorAndClass]);
         ws.addRow(["Ban trực thuộc:", member.department]);
         ws.addRow(["Đơn vị sinh hoạt:", `Tổ ${toId}`]);
-        ws.addRow(["Tổng số buổi điểm danh:", countAttMap[cleanSid] || 0]);
+        ws.addRow(["Tổng số buổi điểm danh:", member.totalSessions ?? countAttMap[cleanSid] ?? 0]);
 
         ws.addRow([]);
-        ws.addRow(["LỊCH SỬ THAM GIA HOẠT ĐỘNG", "Ngày Diễn Ra", "Điểm"]);
+        ws.addRow(["LỊCH SỬ HOẠT ĐỘNG TRONG PHẠM VI TỔ", "Ngày Diễn Ra", "Điểm"]);
 
         ws.getRow(1).font = { bold: true, color: { argb: "FF0284C7" } };
         ws.getRow(9).font = { bold: true, color: { argb: "FFFFFFFF" } };
@@ -462,6 +453,8 @@ export default function TrangChiTietTo({
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-5 font-sans text-slate-800 pb-28 select-none space-y-4">
+        <BulkAttendance requestApproval />
+        <Link href="/admin/duyet-diem-danh" className="inline-flex rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800">Xem danh sách gửi duyệt →</Link>
       {/* HEADER COMPACT */}
       <div className="bg-white border border-slate-200 rounded-2xl px-5 py-4 shadow-xs flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
@@ -534,8 +527,19 @@ export default function TrangChiTietTo({
         </div>
       </div>
 
+      <div className="space-y-3 md:hidden">
+        {loading ? <p>Đang tải danh sách…</p> : !danhSachLoc.length ? <p>Không có thành viên phù hợp.</p> : danhSachLoc.map(m => {
+          const sid=m.studentId.toLowerCase();
+          return <article key={m.id} className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
+            <div className="flex items-start justify-between gap-3"><div className="min-w-0"><h2 className="break-words font-bold">{m.fullName}</h2><p className="mt-1 font-mono text-sm text-sky-700">{m.studentId}</p></div><span className="shrink-0 rounded-lg bg-emerald-50 px-2 py-1 text-sm font-semibold text-emerald-700">{m.totalSessions ?? countAttMap[sid] ?? 0} buổi</span></div>
+            <p className="break-words text-sm text-slate-600">{m.majorAndClass} · {m.department}</p>
+            {checklistDefs.map(def=><label key={def.id} className="flex min-h-11 items-center gap-3 rounded-lg bg-slate-50 px-3 py-2 text-sm"><input type="checkbox" className="h-5 w-5 shrink-0" checked={Boolean(checkedData[sid]?.[def.id])} onChange={()=>handleToggleCheck(m.studentId,def.id,Boolean(checkedData[sid]?.[def.id]))}/>{def.name}</label>)}
+            <RequestMemberRemoval id={m.id} name={m.fullName}/><RequestMemberTransfer id={m.id} name={m.fullName}/>
+          </article>;
+        })}
+      </div>
       {/* BẢNG TÍCH CHỌN THÀNH VIÊN */}
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
+      <div className="hidden md:block bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse whitespace-nowrap">
             <thead>
@@ -546,6 +550,7 @@ export default function TrangChiTietTo({
                 <th className="px-5 py-3.5">Ngành / Lớp</th>
                 <th className="px-5 py-3.5">Ban Trực Thuộc</th>
                 <th className="px-5 py-3.5 text-center">Số Buổi</th>
+                <th className="px-5 py-3.5">Thành viên</th>
                 {checklistDefs.map((def) => (
                   <th key={def.id} className="px-5 py-3.5 text-center">
                     {def.name}
@@ -556,13 +561,13 @@ export default function TrangChiTietTo({
             <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
               {loading ? (
                 <tr>
-                  <td colSpan={6 + checklistDefs.length} className="text-center py-12 text-slate-400">
+                  <td colSpan={7 + checklistDefs.length} className="text-center py-12 text-slate-400">
                     Đang đồng bộ danh sách thành viên Tổ {toId}...
                   </td>
                 </tr>
               ) : danhSachLoc.length === 0 ? (
                 <tr>
-                  <td colSpan={6 + checklistDefs.length} className="text-center py-12 text-slate-400">
+                  <td colSpan={7 + checklistDefs.length} className="text-center py-12 text-slate-400">
                     Tổ {toId} chưa có thành viên nào phù hợp
                   </td>
                 </tr>
@@ -570,7 +575,7 @@ export default function TrangChiTietTo({
                 danhSachLoc.map((m, idx) => {
                   const sid = m.studentId.toLowerCase();
                   const userChecks = checkedData[sid] || {};
-                  const totalSessions = countAttMap[sid] || 0;
+                  const totalSessions = m.totalSessions ?? countAttMap[sid] ?? 0;
 
                   return (
                     <tr key={m.id} className="hover:bg-slate-50/70 transition">
@@ -587,6 +592,7 @@ export default function TrangChiTietTo({
                         {totalSessions} buổi
                       </td>
 
+                      <td className="px-5 py-3"><RequestMemberRemoval id={m.id} name={m.fullName}/><RequestMemberTransfer id={m.id} name={m.fullName}/></td>
                       {checklistDefs.map((def) => {
                         const isChecked = Boolean(userChecks[def.id]);
                         return (

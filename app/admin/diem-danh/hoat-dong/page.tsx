@@ -8,6 +8,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import Link from "next/link";
+import BulkAttendance from "@/components/admin/BulkAttendance";
 
 // Trang này phải được bảo vệ bởi xác thực quản trị và Firestore Security Rules.
 // Kiểm tra ở giao diện không thay thế việc phân quyền/kiểm tra isActive ở máy chủ.
@@ -308,6 +309,7 @@ export default function TrangQuanLyHoatDong() {
       </header>
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 mt-6 space-y-6">
+        <BulkAttendance />
         {loadError && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
           {loadError} Kiểm tra kết nối hoặc quyền truy cập rồi tải lại trang.
           <button type="button" onClick={() => window.location.reload()} className="ml-3 underline font-bold">Tải lại</button>

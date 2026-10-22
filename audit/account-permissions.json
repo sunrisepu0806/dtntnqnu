@@ -1,0 +1,161 @@
+{
+  "checkedAt": "2026-10-21T19:33:02.075Z",
+  "accounts": [
+    {
+      "id": "4751180032",
+      "username": "phu.nv",
+      "name": "Nguyễn Văn Phú",
+      "mssv": "4751180032",
+      "role": "Quản trị viên",
+      "group": "",
+      "ban": null,
+      "disabled": false,
+      "valid": true,
+      "canApprove": true,
+      "routes": [
+        "/admin/phan-quyen",
+        "/admin/diem-danh",
+        "/admin/diem-danh/quet-ma",
+        "/admin/diem-danh/to-truong/1",
+        "/admin/diem-danh/to-truong/2",
+        "/admin/diem-danh/to-truong/3",
+        "/admin/diem-danh/to-truong/4",
+        "/admin/diem-danh/to-truong/5",
+        "/admin/diem-danh/truong-ban/su-kien",
+        "/admin/diem-danh/truong-ban/truyen-thong"
+      ]
+    },
+    {
+      "id": "4756060002",
+      "username": "",
+      "name": "Nguyễn Ngọc Hoài An",
+      "mssv": "4756060002",
+      "role": "Trưởng ban Truyền thông",
+      "group": "",
+      "ban": "Ban Truyền thông",
+      "disabled": false,
+      "valid": true,
+      "canApprove": false,
+      "routes": [
+        "/admin/diem-danh/truong-ban/su-kien",
+        "/admin/diem-danh/truong-ban/truyen-thong"
+      ]
+    },
+    {
+      "id": "4851020071",
+      "username": "",
+      "name": "nhattrung2007",
+      "mssv": "4851020071",
+      "role": "Tổ trưởng",
+      "group": "Tổ 4",
+      "ban": null,
+      "disabled": false,
+      "valid": true,
+      "canApprove": false,
+      "routes": [
+        "/admin/diem-danh/to-truong/4"
+      ]
+    },
+    {
+      "id": "4858010098",
+      "username": "",
+      "name": "phuonguyen2007",
+      "mssv": "4858010098",
+      "role": "Tổ trưởng",
+      "group": "Tổ 3",
+      "ban": null,
+      "disabled": false,
+      "valid": true,
+      "canApprove": false,
+      "routes": [
+        "/admin/diem-danh/to-truong/3"
+      ]
+    },
+    {
+      "id": "chauanh2007",
+      "username": "",
+      "name": "Châu Anh",
+      "mssv": "chauanh2007",
+      "role": "Tổ trưởng",
+      "group": "Tổ 2",
+      "ban": null,
+      "disabled": false,
+      "valid": true,
+      "canApprove": false,
+      "routes": [
+        "/admin/diem-danh/to-truong/2"
+      ]
+    },
+    {
+      "id": "maivu2007",
+      "username": "",
+      "name": "Nguyễn Mai Vũ",
+      "mssv": "maivu2007",
+      "role": "Quản trị viên",
+      "group": "",
+      "ban": null,
+      "disabled": false,
+      "valid": true,
+      "canApprove": true,
+      "routes": [
+        "/admin/phan-quyen",
+        "/admin/diem-danh",
+        "/admin/diem-danh/quet-ma",
+        "/admin/diem-danh/to-truong/1",
+        "/admin/diem-danh/to-truong/2",
+        "/admin/diem-danh/to-truong/3",
+        "/admin/diem-danh/to-truong/4",
+        "/admin/diem-danh/to-truong/5",
+        "/admin/diem-danh/truong-ban/su-kien",
+        "/admin/diem-danh/truong-ban/truyen-thong"
+      ]
+    },
+    {
+      "id": "nhauyen2007",
+      "username": "",
+      "name": "Lê Hoàng Nhã Uyên",
+      "mssv": "nhauyen2007",
+      "role": "Quét mã",
+      "group": "",
+      "ban": null,
+      "disabled": false,
+      "valid": true,
+      "canApprove": false,
+      "routes": [
+        "/admin/diem-danh/quet-ma"
+      ]
+    },
+    {
+      "id": "nhukha2006",
+      "username": "",
+      "name": "Đặng Nguyễn Như Kha",
+      "mssv": "nhukha2006",
+      "role": "Tổ trưởng",
+      "group": "Tổ 5",
+      "ban": null,
+      "disabled": false,
+      "valid": true,
+      "canApprove": false,
+      "routes": [
+        "/admin/diem-danh/to-truong/5"
+      ]
+    },
+    {
+      "id": "nhunguyet2007",
+      "username": "",
+      "name": "Trương Nguyễn Như Nguyệt",
+      "mssv": "nhunguyet2007",
+      "role": "Tổ trưởng",
+      "group": "Tổ 1",
+      "ban": null,
+      "disabled": false,
+      "valid": true,
+      "canApprove": false,
+      "routes": [
+        "/admin/diem-danh/to-truong/1"
+      ]
+    }
+  ],
+  "rulesMatchLocal": true,
+  "publishedRulesName": "e362d14a-8913-46a9-9249-0962ad52869d"
+}

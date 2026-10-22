@@ -1,17 +1,17 @@
 "use client";
+import { memberGroup, memberDepartment } from "@/lib/member-scope";
 
 import { useState, useEffect, useMemo } from "react";
 import { 
   collection, 
   doc, 
-  setDoc, 
   deleteDoc, 
   onSnapshot, 
-  serverTimestamp, 
   writeBatch,
   getDocs
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { saveMember } from "@/lib/member-write";
 import { QRCodeSVG } from "qrcode.react";
 import Link from "next/link";
 
@@ -139,14 +139,6 @@ export default function MemberManagementPage() {
     });
 
     const unsubMem = onSnapshot(collection(db, "users"), (snap) => {
-      if (snap.empty) {
-        const unsubFallback = onSnapshot(collection(db, "members"), (fallbackSnap) => {
-          setRawMembers(fallbackSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
-          memLoaded = true;
-          checkComplete();
-        });
-        return () => unsubFallback();
-      }
       setRawMembers(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
       memLoaded = true;
       checkComplete();
@@ -282,6 +274,10 @@ export default function MemberManagementPage() {
       return;
     }
 
+    if (editingMember && cleanSid !== cleanId(editingMember.studentId)) {
+      alert("MSSV là mã định danh cố định, không thể thay đổi khi sửa hồ sơ.");
+      return;
+    }
     if (!editingMember && members.some((m) => cleanId(m.studentId) === cleanSid)) {
       alert(`Lỗi: Mã sinh viên ${sid} đã tồn tại trong hệ thống!`);
       return;
@@ -293,21 +289,29 @@ export default function MemberManagementPage() {
 
     const payload = {
       mssv: sid,
+      studentId: sid,
       name: String(fd.get("fullName") || "").trim(),
+      fullName: String(fd.get("fullName") || "").trim(),
       majorAndClass: String(fd.get("majorAndClass") || "").trim(),
+      accessGroup: memberGroup(groupValue),
+      accessDepartment: memberDepartment(deptValue),
       to_id: groupValue === "TNV" ? "tnv" : `to_${groupValue}`,
+      group: groupValue,
+      to: groupValue === "TNV" ? "tnv" : `to_${groupValue}`,
+      department: deptValue,
       ban_id: deptValue === "Truyền thông" ? ["bantruyenthong"] : ["bansukien"],
       mangChuyenMon: specialtyValue,
       ngaySinh: formatDobString(fd.get("dob")),
+      dob: formatDobString(fd.get("dob")),
       linkDriveAnh: convertDriveToDirectLink(String(fd.get("avatarUrl") || "")),
-      soBuoiDiemDanh: Number(fd.get("totalSessions")) || 0,
-      role: "Thành viên",
-      passwork: "12345",
-      createdAt: serverTimestamp(),
+      avatarUrl: convertDriveToDirectLink(String(fd.get("avatarUrl") || "")),
     };
 
     try {
-      await setDoc(doc(db, "users", cleanSid), payload, { merge: true });
+      await saveMember(db, {
+        studentId: sid, existingId: editingMember?.id, originalStudentId: editingMember?.studentId,
+        initialSessions: Number(fd.get("totalSessions")) || 0, fields: payload,
+      });
       setIsModalOpen(false);
       setEditingMember(null);
       alert("Đã lưu thông tin thành công lên Firebase!");
@@ -745,6 +749,8 @@ export default function MemberManagementPage() {
                 <input
                   name="studentId"
                   defaultValue={editingMember?.studentId}
+                  readOnly={!!editingMember}
+                  title={editingMember ? "MSSV cố định để giữ liên kết lịch sử điểm danh" : undefined}
                   required
                   placeholder="Ví dụ: 4751180032"
                   className="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-xl font-mono font-bold outline-none focus:bg-white focus:border-[#0284c7]"
@@ -782,6 +788,10 @@ export default function MemberManagementPage() {
                     defaultValue={editingMember?.specialty || (modalDepartment === "Sự kiện" ? "Hậu cần" : "Chụp ảnh")}
                     className="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-xl font-bold outline-none cursor-pointer focus:bg-white focus:border-[#0284c7]"
                   >
+                    {editingMember?.department === modalDepartment && editingMember.specialty &&
+                      !(modalDepartment === "Sự kiện" ? MANG_SU_KIEN : MANG_TRUYEN_THONG).includes(editingMember.specialty as MangChuyenMon) && (
+                        <option value={editingMember.specialty}>{editingMember.specialty}</option>
+                      )}
                     {(modalDepartment === "Sự kiện" ? MANG_SU_KIEN : MANG_TRUYEN_THONG).map((m) => (
                       <option key={m} value={m}>
                         {m}
@@ -810,12 +820,13 @@ export default function MemberManagementPage() {
                 </div>
 
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Khởi tạo số buổi</label>
+                  <label className="font-bold text-slate-700 block mb-1">{editingMember ? "Số buổi hiện tại (tự cập nhật)" : "Khởi tạo số buổi"}</label>
                   <input
                     type="number"
                     min="0"
                     name="totalSessions"
                     defaultValue={editingMember?.totalSessions || 0}
+                    readOnly={!!editingMember}
                     className="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-xl font-bold text-emerald-700 outline-none focus:bg-white focus:border-[#0284c7]"
                   />
                 </div>
