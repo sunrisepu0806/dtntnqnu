@@ -12,7 +12,15 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Extra build/test output dirs (distDir variants) and audit snapshots.
+    ".next-*/**",
+    "audit/**",
   ]),
+  // Node scripts and tests are CommonJS by design.
+  {
+    files: ["**/*.cjs"],
+    rules: { "@typescript-eslint/no-require-imports": "off" },
+  },
 ]);
 
 export default eslintConfig;

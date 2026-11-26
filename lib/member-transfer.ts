@@ -10,7 +10,7 @@ export async function transferMember(body:Record<string,unknown>){
   const session=await readSession();if(!session)throw new AttendanceError("Vui lòng đăng nhập lại.",401);
   const role=session.user.role, action=String(body.action);
   if(!["request","approve","reject"].includes(action))throw new AttendanceError("Thao tác không hợp lệ.");
-  if(role!=="Quản trị viên" && (action!=="request" || !["Tổ trưởng","Trưởng ban Sự kiện","Trưởng ban Truyền thông"].includes(role)))throw new AttendanceError("Không có quyền xử lý đề nghị.",403);
+  if(role!=="Quản trị viên" && (action!=="request" || role!=="Tổ trưởng"))throw new AttendanceError("Không có quyền xử lý đề nghị.",403);
   const memberId=documentId(body.memberId), reason=String(body.reason||"").trim();
   if((action==="request"||action==="reject")&&(!reason||reason.length>1000))throw new AttendanceError("Nhập lý do từ 1 đến 1000 ký tự.");
   const db=adminDb(),memberRef=db.collection("users").doc(memberId),ref=db.collection("member_transfer_requests").doc(memberId);
@@ -23,8 +23,6 @@ export async function transferMember(body:Record<string,unknown>){
       if(!data)throw new AttendanceError("Thành viên không còn trong danh sách.",404);
       const scope=memberScope(data);
       if(role==="Tổ trưởng"&&(!scope.accessGroup||scope.accessGroup!==groupNumber(account.to_id||account.to||account.group)))throw new AttendanceError("Chỉ đề nghị chuyển thành viên thuộc tổ mình.",403);
-      const department=role==="Trưởng ban Sự kiện"?"su-kien":"truyen-thong";
-      if(role.startsWith("Trưởng ban")&&scope.accessDepartment!==department)throw new AttendanceError("Chỉ đề nghị chuyển thành viên thuộc ban mình.",403);
       const toGroup=body.toGroup ? groupNumber(body.toGroup) : scope.accessGroup;
       const toDepartment=body.toDepartment===undefined||body.toDepartment==="keep"?scope.accessDepartment:String(body.toDepartment);
       if(!toGroup||!["","su-kien","truyen-thong"].includes(toDepartment))throw new AttendanceError("Tổ hoặc ban đích không hợp lệ.");

@@ -1,0 +1,69 @@
+{
+  "indexes": [
+    {
+      "fields": [
+        {
+          "fieldPath": "activityId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "timestamp",
+          "order": "DESCENDING"
+        }
+      ],
+      "queryScope": "COLLECTION",
+      "collectionGroup": "attendance"
+    },
+    {
+      "fields": [
+        {
+          "fieldPath": "activityId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "sessionId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "timestamp",
+          "order": "DESCENDING"
+        }
+      ],
+      "queryScope": "COLLECTION",
+      "collectionGroup": "attendance"
+    },
+    {
+      "fields": [
+        {
+          "fieldPath": "activityId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "sessionId",
+          "order": "ASCENDING"
+        }
+      ],
+      "queryScope": "COLLECTION",
+      "collectionGroup": "attendance"
+    },
+    {
+      "fields": [
+        {
+          "fieldPath": "activityId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "archived",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "sessionId",
+          "order": "ASCENDING"
+        }
+      ],
+      "queryScope": "COLLECTION",
+      "collectionGroup": "attendance"
+    }
+  ],
+  "fieldOverrides": []
+}

@@ -79,8 +79,8 @@ export default function DanhSachHoatDongCapGCN() {
       setTenHoatDong('');
       setNgayToChuc('');
       setIsModalCreate(false);
-    } catch (err: any) {
-      alert('Lỗi tạo hoạt động: ' + err.message);
+    } catch (err) {
+      alert('Lỗi tạo hoạt động: ' + (err instanceof Error ? err.message : String(err)));
     } finally {
       setSaving(false);
     }
@@ -90,8 +90,8 @@ export default function DanhSachHoatDongCapGCN() {
     if (!confirm(`Bạn có chắc chắn muốn xóa hoạt động "${name}"?`)) return;
     try {
       await deleteDoc(doc(db, 'events', id));
-    } catch (err: any) {
-      alert('Lỗi: ' + err.message);
+    } catch (err) {
+      alert('Lỗi: ' + (err instanceof Error ? err.message : String(err)));
     }
   };
 
@@ -118,7 +118,7 @@ export default function DanhSachHoatDongCapGCN() {
             Quản Lý & Cấp Giấy Chứng Nhận
           </h1>
           <p className="text-xs text-slate-500 font-medium mt-1">
-            Chọn hoạt động để tải lên tệp GCN hàng loạt và quản lý tra cứu theo MSSV
+            Chọn hoạt động để quản lý thư mục Drive và tra cứu giấy chứng nhận theo MSSV
           </p>
         </div>
 

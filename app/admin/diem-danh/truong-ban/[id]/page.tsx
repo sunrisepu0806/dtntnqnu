@@ -1,17 +1,16 @@
 "use client";
+import SingleDepartmentAttendance from "@/components/admin/SingleDepartmentAttendance";
+import {specialtyLabel} from "@/lib/specialties";
+import { groupNumber } from "@/lib/permissions";
+import DepartmentActivities from "@/components/admin/DepartmentActivities";
+import StudentIdAttendance from "@/components/admin/StudentIdAttendance";
 
-import { useState, useEffect, useMemo, useRef, use } from "react";
-import { 
-  query, where,
-  collection, 
-  onSnapshot, 
-doc, 
-increment, 
-} from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { useState, useEffect, useMemo, use } from "react";
+
+
 import Link from "next/link";
 
-import BulkAttendance from "@/components/admin/BulkAttendance";
+
 import { RequestMemberTransfer } from "@/components/admin/MemberTransfer";
 
 interface Member {
@@ -34,7 +33,7 @@ interface TaskRecord {
   productLink: string;
   pointsAdded: number;
   approvedBy: string;
-  timestamp?: any;
+  timestamp?: import("firebase/firestore").Timestamp;
 }
 
 const normalize = (value: unknown): string =>
@@ -79,11 +78,13 @@ export default function TrangChiTietBan({
 
   const [isMounted, setIsMounted] = useState(false);
   const [members, setMembers] = useState<Member[]>([]);
-  const [tasks, setTasks] = useState<TaskRecord[]>([]);
+  const [, setTasks] = useState<TaskRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [exporting, setExporting] = useState(false);
   const [tuKhoa, setTuKhoa] = useState("");
+  const [openedActivities, setOpenedActivities] = useState(false);
+  const [workspace, setWorkspace] = useState<"attendance" | "activities" | "members">("attendance");
 
   const [hasAccess, setHasAccess] = useState<boolean | null>(null);
   const [checkedSlug, setCheckedSlug] = useState<string | null>(null);
@@ -96,14 +97,11 @@ export default function TrangChiTietBan({
 
   const [isModalCong, setIsModalCong] = useState(false);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
-  const [loaiNhiemVu, setLoaiNhiemVu] = useState(isSuKien ? "Chụp ảnh hoạt động" : "Thiết kế ấn phẩm");
-  const [congViec, setCongViec] = useState("");
-  const [sanPham, setSanPham] = useState("");
-  const [soBuoiCong, setSoBuoiCong] = useState(1);
-  const [dangLuu, setDangLuu] = useState(false);
-  const awardRequestId = useRef<string | null>(null);
 
   useEffect(() => {
+    // Batch resource initialization after commit and cancel stale route setup.
+    let dispose: void | (() => void);
+    const setup = setTimeout(() => { dispose = (() => {
     setIsMounted(true);
 
     setMembers([]);
@@ -124,7 +122,8 @@ export default function TrangChiTietBan({
       role: typeof session.role === "string" ? session.role : "",
       userDept: tenBan,
     });
-    const applyUsers = (snap: { docs: { id: string; data: () => any }[] }) => {
+    if (workspace !== "members") return;
+    const applyUsers = (snap: { docs: { id: string; data: () => import("firebase/firestore").DocumentData }[] }) => {
       const list: Member[] = [];
       snap.docs.forEach((d) => {
         const data = d.data();
@@ -142,8 +141,9 @@ export default function TrangChiTietBan({
             fullName: data.name || data.fullName || data.hoTen || "Thành viên",
             studentId: String(data.mssv || data.studentId || d.id).trim(),
             department: tenBan,
-            specialty: data.mangChuyenMon || data.specialty || "Chưa phân mảng",
-            group: data.to_id || data.group || "N/A",
+            specialty: specialtyLabel(data.mangChuyenMon || data.specialty),
+            // Stored as "to_1" / "Tổ 1" / "1"; show it the same way everywhere.
+            group: groupNumber(data.to_id || data.group) ? `Tổ ${groupNumber(data.to_id || data.group)}` : String(data.to_id || data.group || "Chưa có tổ"),
             soBuoiDiemDanh: Number(data.soBuoiDiemDanh || 0),
           });
         }
@@ -152,7 +152,7 @@ export default function TrangChiTietBan({
       setLoading(false);
     };
 
-    const applyTasks = (snap: { docs: { id: string; data: () => any }[] }) => {
+    const applyTasks = (snap: { docs: { id: string; data: () => import("firebase/firestore").DocumentData }[] }) => {
       const list: TaskRecord[] = [];
       snap.docs.forEach((d) => {
         const data = d.data();
@@ -192,7 +192,7 @@ export default function TrangChiTietBan({
         const signature = JSON.stringify(result);
         if (signature === previous) { setLoadError(""); return; }
         previous = signature;
-        const snapshot = (rows: { id: string; data: any }[]) => ({ docs: rows.map(row => ({ id: row.id, data: () => row.data })) });
+        const snapshot = (rows: { id: string; data: import("firebase/firestore").DocumentData }[]) => ({ docs: rows.map(row => ({ id: row.id, data: () => row.data })) });
         applyUsers(snapshot(result.users)); applyTasks(snapshot(result.tasks)); setLoadError("");
       } catch (error) { if (!controller.signal.aborted) { setLoadError(error instanceof Error ? error.message : "Không tải được dữ liệu ban."); setLoading(false); } }
       finally { inFlight = false; }
@@ -201,7 +201,10 @@ export default function TrangChiTietBan({
     refresh(); const timer = setInterval(refresh, 30000);
     document.addEventListener("visibilitychange", refresh);
     return () => { controller.abort(); clearInterval(timer); document.removeEventListener("visibilitychange", refresh); };
-  }, [banSlug, isSuKien, tenBan]);
+  
+    })(); }, 0);
+    return () => { clearTimeout(setup); dispose?.(); };
+  }, [banSlug, isSuKien, tenBan, workspace]);
 
   const danhSachLoc = useMemo(() => {
     return members.filter((m) => {
@@ -216,202 +219,18 @@ export default function TrangChiTietBan({
 
   const handleMoModal = (member: Member) => {
     if (checkedSlug !== banSlug || !readAllowedSession(banSlug)) return;
-    awardRequestId.current = crypto.randomUUID();
     setSelectedMember(member);
-    setCongViec("");
-    setSanPham("");
-    setSoBuoiCong(1);
-    setLoaiNhiemVu(isSuKien ? "Chụp ảnh hoạt động" : "Thiết kế ấn phẩm");
     setIsModalCong(true);
   };
 
-  const handleXacNhanCong = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (dangLuu || !selectedMember || checkedSlug !== banSlug || !readAllowedSession(banSlug)) return;
-    if (!Number.isInteger(soBuoiCong) || soBuoiCong < 1 || soBuoiCong > 5) {
-      alert("Số buổi phải là số nguyên từ 1 đến 5.");
-      return;
-    }
-    if (!congViec.trim()) {
-      alert("Vui lòng điền mô tả công việc đã làm!");
-      return;
-    }
-
-    setDangLuu(true);
-    try {
-      const response = await fetch("/api/attendance/award", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requestId: awardRequestId.current, memberId: selectedMember.id, points: soBuoiCong, taskName: loaiNhiemVu,
-          workDescription: congViec.trim(), productLink: sanPham.trim() }),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Không thể cộng buổi.");
-
-      alert(result.pendingApproval ? "Đã gửi đề nghị — Chờ admin duyệt. Chưa cộng buổi." : `Đã cộng +${soBuoiCong} buổi cho thành viên ${selectedMember.fullName}!`);
-      window.dispatchEvent(new Event("attendance-requests-changed"));
-      setIsModalCong(false);
-    } catch (err: any) {
-      alert("Lỗi khi lưu dữ liệu: " + err.message);
-    } finally {
-      setDangLuu(false);
-    }
-  };
+  
 
   // NẠP ĐỘNG EXCELJS TRÁNH LỖI ĐÓNG GÓI CLIENT
   const handleXuatFileBaoCao = async () => {
-    if (checkedSlug !== banSlug || !readAllowedSession(banSlug)) return;
-    if (members.length === 0) {
-      alert(`Ban ${tenBan} chưa có thành viên nào để xuất file!`);
-      return;
-    }
-
     setExporting(true);
-    await new Promise((resolve) => setTimeout(resolve, 100));
-
-    try {
-      const ExcelJSModule = await import("exceljs");
-      const ExcelJS = ExcelJSModule.default || ExcelJSModule;
-      const workbook = new ExcelJS.Workbook();
-
-      const summarySheetName = `Tong_Hop_${isSuKien ? "Su_Kien" : "Truyen_Thong"}`;
-      const summaryWs = workbook.addWorksheet(summarySheetName);
-
-      summaryWs.columns = [
-        { header: "STT", key: "stt", width: 8 },
-        { header: "HỌ VÀ TÊN", key: "fullName", width: 26 },
-        { header: "MÃ SINH VIÊN (MSSV)", key: "studentId", width: 22 },
-        { header: "BAN CHUYÊN MÔN", key: "department", width: 20 },
-        { header: "MẢNG PHỤ TRÁCH", key: "specialty", width: 24 },
-        { header: "TỔ SINH HOẠT", key: "group", width: 14 },
-        { header: "TỔNG BUỔI ĐIỂM DANH", key: "soBuoiDiemDanh", width: 22 },
-      ];
-
-      summaryWs.getColumn("studentId").numFmt = "@";
-      summaryWs.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
-      summaryWs.getRow(1).alignment = { vertical: "middle", horizontal: "center" };
-      summaryWs.getRow(1).fill = {
-        type: "pattern",
-        pattern: "solid",
-        fgColor: { argb: isSuKien ? "FFD97706" : "FF0284C7" },
-      };
-
-      members.forEach((m, idx) => {
-        const row = summaryWs.addRow({
-          stt: idx + 1,
-          fullName: m.fullName,
-          studentId: m.studentId,
-          department: m.department,
-          specialty: m.specialty,
-          group: m.group,
-          soBuoiDiemDanh: m.soBuoiDiemDanh,
-        });
-
-        row.alignment = { vertical: "middle" };
-        row.getCell("stt").alignment = { horizontal: "center" };
-        row.getCell("studentId").alignment = { horizontal: "center" };
-        row.getCell("group").alignment = { horizontal: "center" };
-        row.getCell("soBuoiDiemDanh").alignment = { horizontal: "center" };
-        row.getCell("studentId").numFmt = "@";
-      });
-
-      const sheetNamesSet = new Set<string>();
-      sheetNamesSet.add(summarySheetName);
-
-      members.forEach((member, index) => {
-        const cleanSid = member.studentId.toLowerCase();
-        const safeName = (member.studentId || `TV_${index}`)
-          .replace(/[\\/?*[\]:]/g, "_")
-          .substring(0, 30);
-
-        let finalSheetName = safeName;
-        let counter = 1;
-        while (sheetNamesSet.has(finalSheetName)) {
-          finalSheetName = `${safeName.substring(0, 26)}_${counter}`;
-          counter++;
-        }
-        sheetNamesSet.add(finalSheetName);
-
-        const ws = workbook.addWorksheet(finalSheetName);
-        ws.columns = [
-          { width: 24 },
-          { width: 36 },
-          { width: 32 },
-          { width: 14 },
-          { width: 22 },
-          { width: 20 },
-        ];
-
-        ws.addRow(["HỒ SƠ CHUYÊN MÔN THÀNH VIÊN", ""]);
-        ws.addRow(["Họ và tên:", member.fullName]);
-
-        const rId = ws.addRow(["Mã sinh viên (MSSV):", member.studentId]);
-        rId.getCell(2).numFmt = "@";
-
-        ws.addRow(["Ban trực thuộc:", member.department]);
-        ws.addRow(["Mảng chuyên môn:", member.specialty]);
-        ws.addRow(["Tổ sinh hoạt:", member.group]);
-        ws.addRow(["Tổng số buổi điểm danh hiện tại:", member.soBuoiDiemDanh]);
-        ws.addRow([]);
-
-        ws.addRow([
-          "HẠNG MỤC NHIỆM VỤ",
-          "CÔNG VIỆC ĐÃ LÀM",
-          "SẢN PHẨM ĐÍNH KÈM",
-          "BUỔI CỘNG",
-          "NGƯỜI PHÊ DUYỆT",
-          "THỜI GIAN GHI NHẬN",
-        ]);
-
-        ws.getRow(1).font = { bold: true, color: { argb: isSuKien ? "FFD97706" : "FF0284C7" } };
-        ws.getRow(9).font = { bold: true, color: { argb: "FFFFFFFF" } };
-        ws.getRow(9).alignment = { vertical: "middle", horizontal: "center" };
-        ws.getRow(9).fill = {
-          type: "pattern",
-          pattern: "solid",
-          fgColor: { argb: isSuKien ? "FFD97706" : "FF0284C7" },
-        };
-
-        const myTasks = tasks.filter((t) => t.studentId.toLowerCase() === cleanSid);
-
-        if (myTasks.length === 0) {
-          const emptyRow = ws.addRow(["Chưa có ghi nhận công việc chuyên môn nào", "—", "—", 0, "—", "—"]);
-          emptyRow.alignment = { vertical: "middle" };
-        } else {
-          myTasks.forEach((t) => {
-            const timeStr = t.timestamp?.seconds
-              ? new Date(t.timestamp.seconds * 1000).toLocaleString("vi-VN")
-              : "Vừa xong";
-
-            const rTask = ws.addRow([
-              t.taskName,
-              t.workDescription,
-              t.productLink || "Không có",
-              `+${t.pointsAdded}`,
-              t.approvedBy,
-              timeStr,
-            ]);
-
-            rTask.alignment = { vertical: "middle" };
-            rTask.getCell(4).alignment = { horizontal: "center" };
-            rTask.getCell(6).alignment = { horizontal: "center" };
-          });
-        }
-      });
-
-      const buffer = await workbook.xlsx.writeBuffer();
-      const blob = new Blob([buffer], {
-        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=utf-8",
-      });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `BaoCao_Ban_${isSuKien ? "SuKien" : "TruyenThong"}_${Date.now()}.xlsx`;
-      a.click();
-    } catch (err: any) {
-      alert("Lỗi xuất file: " + err.message);
-    } finally {
-      setExporting(false);
-    }
+    try { const {downloadAttendanceReport}=await import("@/lib/attendance-export"); await downloadAttendanceReport({department:banSlug}); }
+    catch(e){alert(e instanceof Error?e.message:"Không xuất được báo cáo.");}
+    finally{setExporting(false);}
   };
 
   if (!isMounted || checkedSlug !== banSlug || hasAccess === null) return <p className="p-6">Đang kiểm tra quyền truy cập...</p>;
@@ -440,56 +259,39 @@ export default function TrangChiTietBan({
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-800 pb-28 select-none">
-      <header className="bg-white border-b border-slate-200 px-6 py-4 shadow-xs sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="department-workspace min-h-screen bg-slate-50 font-sans text-slate-800 pb-28">
+      <header className="desk-toolbar">
+        <h1>Ban {tenBan}</h1>
+        <details className="desk-more" key={banSlug}>
+          <summary>Tiện ích ban</summary>
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <Link href="/admin/diem-danh/truong-ban" className="text-xs font-bold text-slate-500 hover:text-slate-900">
-                Tổng quan ban
-              </Link>
-              <span className="text-slate-300">/</span>
-              <span className="text-xs font-bold text-[#0284c7]">Ban {tenBan}</span>
-            </div>
-            <h1 className="text-xl font-black text-slate-900 tracking-tight uppercase">
-              Quản Lý Ban {tenBan}
-            </h1>
-            <p className="text-xs text-slate-500 font-medium mt-0.5">
-              Theo dõi thành viên, ghi nhận đầu việc chuyên môn và xuất báo cáo chi tiết
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* NÚT XUẤT FILE ĐÃ SỬA CHỐNG HYDRATION MISMATCH VÀ CRASH NỀN */}
-            <button
-              type="button"
-              disabled={exporting}
-              onClick={handleXuatFileBaoCao}
-              style={{ backgroundColor: "#047857", color: "#ffffff" }}
-              className="px-4 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow-sm border border-emerald-900 cursor-pointer disabled:opacity-50"
-            >
-              {exporting ? "Đang tạo file Excel..." : "Xuất File Báo Cáo Ban"}
+            <button type="button" disabled={exporting} onClick={handleXuatFileBaoCao}>
+              {exporting ? "Đang xuất…" : "Xuất báo cáo ban"}
             </button>
-
-            <Link
-              href="/admin/diem-danh/truong-ban"
-              className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition border border-slate-200"
-            >
-              Quay lại tổng quan
+            <Link href="/admin/duyet-diem-danh">Xem đề nghị</Link>
+            <Link href={`/admin/diem-danh/truong-ban/${isSuKien ? "truyen-thong" : "su-kien"}`}>
+              Sang ban {isSuKien ? "Truyền thông" : "Sự kiện"}
             </Link>
+            {currentUser.role === "Quản trị viên" && <Link href="/admin/diem-danh/truong-ban">Tổng quan các ban</Link>}
           </div>
-        </div>
+        </details>
       </header>
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 mt-6 space-y-4">
-        <div className="flex flex-wrap gap-3"><Link className="rounded-xl border px-3 py-2 text-sm font-semibold text-sky-700" href={`/admin/diem-danh/truong-ban/${isSuKien ? "truyen-thong" : "su-kien"}`}>Chuyển sang ban {isSuKien ? "Truyền thông" : "Sự kiện"}</Link></div>
-        <BulkAttendance />
-        <Link href="/admin/duyet-diem-danh" className="inline-flex rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800">Xem danh sách gửi duyệt →</Link>
+      <div className="space-y-3">
+        <nav aria-label="Chức năng của ban" className="workspace-tabs">
+          {([{id:"attendance",label:"Điểm danh mảng"},{id:"activities",label:"Việc mảng"},{id:"members",label:"Nhân sự"}] as const).map(item => (
+            <button key={item.id} type="button" aria-pressed={workspace === item.id} onClick={() => { if (item.id === "activities") setOpenedActivities(true); setWorkspace(item.id); }}>{item.label}</button>
+          ))}
+        </nav>
+        <div hidden={workspace !== "attendance"}><StudentIdAttendance key={banSlug} flow="department" department={banSlug} active={workspace === "attendance"} /></div>
+        <div hidden={workspace !== "activities"}>{openedActivities && <DepartmentActivities department={banSlug}/>}</div>
         {loadError && <p role="alert" className="text-red-700">{loadError}</p>}
+        <div hidden={workspace !== "members"} className="space-y-4">
+        <div><h2 className="text-xl font-bold">Nhân sự Ban {tenBan}</h2><p className="mt-1 text-sm text-slate-600">Tra cứu thành viên, chuyên môn và lịch sử tham gia.</p></div>
         <div className="bg-white border border-slate-300 rounded-2xl p-3.5 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="w-full sm:flex-1 relative">
             <input
               type="text"
+              aria-label="Tìm nhân sự ban"
               placeholder={`Tìm kiếm thành viên Ban ${tenBan} theo MSSV, Họ tên hoặc Mảng...`}
               value={tuKhoa}
               onChange={(e) => setTuKhoa(e.target.value)}
@@ -514,7 +316,7 @@ export default function TrangChiTietBan({
         </div>
 
         <div className="space-y-3 md:hidden">
-          {loading ? <p>Đang tải danh sách…</p> : !danhSachLoc.length ? <p>Không có thành viên phù hợp.</p> : danhSachLoc.map(m=><article key={m.id} className="space-y-3 rounded-2xl border bg-white p-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><h2 className="break-words font-bold">{m.fullName}</h2><p className="mt-1 font-mono text-sm text-sky-700">{m.studentId}</p></div><span className="shrink-0 text-sm font-semibold text-emerald-700">{m.soBuoiDiemDanh} buổi</span></div><p className="text-sm text-slate-600">{m.specialty} · {m.group}</p><button type="button" onClick={()=>handleMoModal(m)} className="min-h-11 w-full rounded-xl bg-sky-600 px-4 py-3 text-sm font-semibold text-white">{currentUser.role === "Quản trị viên" ? "+ Cộng buổi" : "Gửi duyệt"}</button><RequestMemberTransfer id={m.id} name={m.fullName}/></article>)}
+          {loading ? <p>Đang tải danh sách…</p> : !danhSachLoc.length ? <p>Không có thành viên phù hợp.</p> : danhSachLoc.map(m=><article key={m.id} className="space-y-3 rounded-2xl border bg-white p-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><h2 className="break-words font-bold">{m.fullName}</h2><p className="mt-1 font-mono text-sm text-sky-700">{m.studentId}</p></div><span className="shrink-0 text-sm font-semibold text-emerald-700">{m.soBuoiDiemDanh} buổi</span></div><p className="text-sm text-slate-600">{m.specialty} · {m.group}</p><button type="button" onClick={()=>handleMoModal(m)} className="min-h-11 w-full rounded-xl bg-sky-600 px-4 py-3 text-sm font-semibold text-white">{currentUser.role === "Quản trị viên" ? "Gửi duyệt theo buổi" : "Gửi duyệt"}</button>{currentUser.role === "Quản trị viên" && <RequestMemberTransfer id={m.id} name={m.fullName}/>}</article>)}
         </div>
         <div className="hidden md:block bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
           <div className="overflow-x-auto">
@@ -566,9 +368,9 @@ export default function TrangChiTietBan({
                           onClick={() => handleMoModal(m)}
                           className="px-3.5 py-1.5 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] text-white font-bold text-xs transition cursor-pointer shadow-xs"
                         >
-                          {currentUser.role === "Quản trị viên" ? "+ Cộng Buổi" : "Gửi duyệt"}
+                          {currentUser.role === "Quản trị viên" ? "Điểm danh / gửi duyệt" : "Gửi duyệt"}
                         </button>
-                        <RequestMemberTransfer id={m.id} name={m.fullName}/>
+                        {currentUser.role === "Quản trị viên" && <RequestMemberTransfer id={m.id} name={m.fullName}/>}
                       </td>
                     </tr>
                   ))
@@ -577,121 +379,10 @@ export default function TrangChiTietBan({
             </table>
           </div>
         </div>
-      </main>
-
-      {isModalCong && selectedMember && (
-        <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-lg max-h-[90dvh] overflow-y-auto p-4 sm:p-7 rounded-3xl border border-slate-200 shadow-2xl">
-            <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-100">
-              <div>
-                <h3 className="text-base font-bold text-slate-900 uppercase">
-                  {currentUser.role === "Quản trị viên" ? "Cộng buổi" : "Đề nghị điểm danh"} Ban {tenBan}
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Thành viên: <strong className="text-slate-900">{selectedMember.fullName}</strong> ({selectedMember.studentId})
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsModalCong(false)}
-                className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs cursor-pointer"
-              >
-                Đóng
-              </button>
-            </div>
-
-            <form onSubmit={handleXacNhanCong} className="space-y-4 text-xs">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1.5 uppercase text-[11px]">
-                    Hạng Mục Nhiệm Vụ *
-                  </label>
-                  <select
-                    value={loaiNhiemVu}
-                    onChange={(e) => setLoaiNhiemVu(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 p-2.5 rounded-xl font-bold text-slate-800 outline-none focus:bg-white focus:border-[#0284c7]"
-                  >
-                    {isSuKien ? (
-                      <>
-                        <option value="Chụp ảnh hoạt động">Chụp ảnh hoạt động / Sự kiện</option>
-                        <option value="Hậu cần sân khấu">Hậu cần & Bố trí sân khấu</option>
-                        <option value="Điều phối âm thanh ánh sáng">Điều phối âm thanh / Ánh sáng</option>
-                        <option value="Nhiệm vụ sự kiện khác">Nhiệm vụ sự kiện khác</option>
-                      </>
-                    ) : (
-                      <>
-                        <option value="Thiết kế ấn phẩm">Thiết kế ấn phẩm (Poster / Banner)</option>
-                        <option value="Viết bài truyền thông">Viết bài truyền thông / Content</option>
-                        <option value="Quay và dựng video">Quay và dựng video (Reels / TikTok)</option>
-                        <option value="Nhiệm vụ truyền thông khác">Nhiệm vụ truyền thông khác</option>
-                      </>
-                    )}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1.5 uppercase text-[11px]">
-                    Số Buổi Điểm Danh Cộng Thêm *
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="5"
-                    required
-                    value={soBuoiCong}
-                    onChange={(e) => setSoBuoiCong(Number(e.target.value) || 1)}
-                    className="w-full bg-slate-50 border border-slate-300 p-2.5 rounded-xl font-mono font-bold text-emerald-700 outline-none focus:bg-white focus:border-[#0284c7]"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-700 mb-1.5 uppercase text-[11px]">
-                  Công Việc Đã Làm Cụ Thể *
-                </label>
-                <textarea
-                  required
-                  rows={3}
-                  value={congViec}
-                  onChange={(e) => setCongViec(e.target.value)}
-                  placeholder="Ví dụ: Chụp và chọn lọc 120 ảnh cho sự kiện kỷ niệm ngày thành lập..."
-                  className="w-full bg-slate-50 border border-slate-300 p-3 rounded-xl font-medium text-xs outline-none focus:bg-white focus:border-[#0284c7] transition resize-none leading-relaxed"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-700 mb-1.5 uppercase text-[11px]">
-                  Sản Phẩm Đính Kèm (Link Drive / Bài viết nếu có)
-                </label>
-                <input
-                  type="text"
-                  value={sanPham}
-                  onChange={(e) => setSanPham(e.target.value)}
-                  placeholder="Ví dụ: drive.google.com/... hoặc link bài viết"
-                  className="w-full bg-slate-50 border border-slate-300 p-2.5 rounded-xl text-xs font-mono outline-none focus:bg-white focus:border-[#0284c7]"
-                />
-              </div>
-
-              <div className="pt-2 flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsModalCong(false)}
-                  className="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold transition cursor-pointer"
-                >
-                  Hủy Bỏ
-                </button>
-                <button
-                  type="submit"
-                  disabled={dangLuu}
-                  className="flex-1 py-2.5 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] text-white font-bold transition uppercase cursor-pointer disabled:opacity-60"
-                >
-                  {dangLuu ? "Đang gửi..." : currentUser.role === "Quản trị viên" ? "Xác nhận cộng buổi" : "Gửi admin duyệt"}
-                </button>
-              </div>
-            </form>
-          </div>
         </div>
-      )}
+      </div>
+
+      {isModalCong && selectedMember && <SingleDepartmentAttendance memberId={selectedMember.id} name={selectedMember.fullName} department={banSlug} onClose={()=>setIsModalCong(false)}/>}
     </div>
   );
 }

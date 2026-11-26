@@ -6,7 +6,12 @@
     "dev": "next dev --webpack",
     "build": "next build --webpack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "dev:portal": "node lab/portal/server.cjs",
+    "dev:test": "node scripts/start-test-web.cjs",
+    "dev:phone": "node scripts/local-https.cjs",
+    "seed:test": "node scripts/seed-test-data.cjs",
+    "emulators:test": "firebase emulators:start --only firestore,auth --project demo-webdtntn --config firebase.emulator.json"
   },
   "dependencies": {
     "@types/leaflet": "^1.9.22",

@@ -1,5 +1,10 @@
 export const ROLES = ["Quản trị viên", "Tổ trưởng", "Trưởng ban Sự kiện", "Trưởng ban Truyền thông", "Quét mã"] as const;
 export type Role = (typeof ROLES)[number];
+export const activityManagementPath = "/admin/diem-danh/hoat-dong";
+export const attendanceReviewPath = activityManagementPath + "/de-nghi/diem-danh";
+export function attendanceRequestsPath(role?: string) {
+  return role === "Quản trị viên" ? attendanceReviewPath : "/admin/duyet-diem-danh";
+}
 export type SessionUser = { mssv: string; name: string; role: Role; to: string; to_id: string; isAdmin: boolean };
 
 export function isRole(value: unknown): value is Role {
@@ -7,7 +12,7 @@ export function isRole(value: unknown): value is Role {
 }
 
 export function groupNumber(value: unknown): string | null {
-  const match = String(value ?? "").trim().match(/^(?:Tổ\s*)?([1-5])$/i);
+  const match = String(value ?? "").trim().match(/^(?:Tổ\s*|to_)?([1-5])$/i);
   return match?.[1] ?? null;
 }
 

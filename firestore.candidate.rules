@@ -37,16 +37,17 @@ service cloud.firestore {
     match /users/{id} {
       allow read: if canReadMember();
       allow create, update: if admin() && safeMember();
-      allow delete: if admin();
+      allow delete: if false;
     }
     match /members/{id} {
       allow read: if canReadMember();
       allow create, update: if admin() && safeMember();
-      allow delete: if admin();
+      allow delete: if false;
     }
     match /activities/{id} {
-      allow read: if signedIn();
-      allow write: if admin();
+      allow read: if signedIn() && !scanner();
+      allow create, update: if admin();
+      allow delete: if false;
     }
     match /attendance/{id} {
       allow read: if admin() || scanner() || (groupLeader() && resource.data.accessGroup == session().group);
@@ -70,10 +71,9 @@ service cloud.firestore {
     match /activity_forms/{id} { allow read: if true; allow write: if admin(); }
     match /events/{id} { allow read: if true; allow write: if admin(); }
     match /certificates/{id} { allow read: if true; allow write: if admin(); }
-    // Existing public activity pages count registrations via a direct collection read.
-    // Keep that contract; a separate public-site migration is needed to expose counts only.
+    // Registration profiles are private. Public pages must use the count-only endpoint.
     match /activity_registrations/{id} {
-      allow read: if true;
+      allow read: if admin();
       allow create: if request.resource.data.keys().hasOnly([
           'answers', 'activityTitle', 'activityId', 'fullName', 'studentId', 'group', 'major', 'dob', 'registeredAt'
         ]) && request.resource.data.activityId is string

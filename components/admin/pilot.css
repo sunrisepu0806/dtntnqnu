@@ -1,0 +1,3 @@
+@import "../../lab/portal/style.css";
+
+.pilot-workspace[data-admin-entry="true"] #logout { display: none; }

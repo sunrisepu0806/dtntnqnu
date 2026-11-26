@@ -4,6 +4,9 @@ import { useState, useEffect, useMemo } from "react";
 import { collection, onSnapshot, doc, setDoc, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import Link from "next/link";
+import AttendanceFolder from "../AttendanceFolder";
+import AttendanceSections from "../AttendanceSections";
+import styles from "../attendance.module.css";
 
 interface Member {
   id: string;
@@ -19,7 +22,7 @@ interface ChecklistItem {
 }
 
 // Bóc tách chính xác số Tổ 1, 2, 3, 4, 5 từ Firebase
-const extractGroupNumber = (data: any): string => {
+const extractGroupNumber = (data: import("firebase/firestore").DocumentData): string => {
   const raw = String(data.to || data.to_id || data.group || data.toSinhHoat || "").trim().toUpperCase();
   if (!raw || raw.includes("TNV") || raw.includes("TỰ DO")) return "";
   const match = raw.match(/[1-5]/);
@@ -38,7 +41,7 @@ export default function TrangQuanLyToAdmin() {
   const [dangTao, setDangTao] = useState(false);
 
   useEffect(() => {
-    const parseDocs = (docs: any[]) => {
+    const parseDocs = (docs: import("firebase/firestore").QueryDocumentSnapshot[]) => {
       const list: Member[] = [];
       const seen = new Set<string>();
 
@@ -142,8 +145,8 @@ export default function TrangQuanLyToAdmin() {
       setTenMucMoi("");
       setIsModalThemMuc(false);
       alert("Đã thêm hạng mục kiểm tra mới!");
-    } catch (err: any) {
-      alert("Lỗi: " + err.message);
+    } catch (err) {
+      alert("Lỗi: " + (err instanceof Error ? err.message : String(err)));
     } finally {
       setDangTao(false);
     }
@@ -154,44 +157,26 @@ export default function TrangQuanLyToAdmin() {
     if (!confirm(`Bạn có chắc muốn xóa mục "${name}"?`)) return;
     try {
       await deleteDoc(doc(db, "group_checklist_defs", id));
-    } catch (err: any) {
-      alert("Lỗi khi xóa: " + err.message);
+    } catch (err) {
+      alert("Lỗi khi xóa: " + (err instanceof Error ? err.message : String(err)));
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-800 pb-28 select-none">
-      {/* HEADER */}
-      <header className="bg-white border-b border-slate-200 px-6 py-4 shadow-xs sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
-            <h1 className="text-xl font-black text-slate-900 tracking-tight uppercase">
-              Quản Lý 5 Tổ Tình Nguyện
-            </h1>
-            <p className="text-xs text-slate-500 font-medium mt-0.5">
-              Theo dõi và giao các hạng mục cần xác nhận xuống từng Tổ
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setIsModalThemMuc(true)}
-              className="px-4 py-2 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] text-white text-xs font-bold transition cursor-pointer shadow-xs"
-            >
-              + Thêm Hạng Mục Kiểm Tra
-            </button>
-            <Link
-              href="/admin/diem-danh"
-              className="px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold transition"
-            >
-              Bảng Điều Phối
-            </Link>
-          </div>
-        </div>
+    <div>
+      <header className={styles.pageHeader}>
+        <div><h1>Điểm danh theo tổ</h1><p>Chọn tổ để điểm danh và kiểm tra các hạng mục của thành viên.</p></div>
+        <button type="button" className={styles.headerButton} onClick={() => setIsModalThemMuc(true)}>Thêm hạng mục</button>
       </header>
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 mt-6 space-y-6">
+      <AttendanceSections active="group" />
+      <div className={styles.body + " space-y-6"}>
+        <h2 className={styles.unitHeading} id="chon-to" tabIndex={-1}>Chọn tổ</h2>
+        <nav className={styles.shortcutGrid + " " + styles.groups} aria-label="Chọn tổ">
+          {danhSach5To.map(item => (
+            <AttendanceFolder key={item.toNum} href={`/admin/diem-danh/to-truong/${item.toNum}`} icon="team"
+              name={`Tổ ${item.toNum}`} detail={loading ? "Đang tải…" : `${item.siSo} thành viên`} />
+          ))}
+        </nav>
         {/* DANH SÁCH CÁC MỤC DO ADMIN THÊM */}
         {checklistDefs.length > 0 && (
           <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-xs flex flex-wrap items-center gap-2">
@@ -215,69 +200,11 @@ export default function TrangQuanLyToAdmin() {
           </div>
         )}
 
-        {/* 5 KHỐI TỔ ĐIỀU HƯỚNG CHÍNH */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
-          {danhSach5To.map((item) => (
-            <div
-              key={item.toNum}
-              className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs flex flex-col justify-between space-y-4"
-            >
-              <div>
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                  <span className="text-base font-black text-slate-900">
-                    TỔ {item.toNum}
-                  </span>
-                  <span className="px-2.5 py-0.5 rounded-full bg-sky-50 text-[#0284c7] border border-sky-100 text-xs font-bold font-mono">
-                    {item.siSo} thành viên
-                  </span>
-                </div>
-
-                <div className="mt-3.5 space-y-2">
-                  {checklistDefs.length === 0 ? (
-                    <p className="text-[11px] text-slate-400 italic py-2">
-                      Chưa có hạng mục kiểm tra nào được thêm.
-                    </p>
-                  ) : (
-                    item.ketQua.map((muc) => (
-                      <div key={muc.defId} className="text-xs">
-                        <div className="flex justify-between items-center text-[11px] mb-1">
-                          <span className="font-semibold text-slate-600 truncate max-w-[125px]">
-                            {muc.defName}
-                          </span>
-                          <span className="font-mono font-bold text-slate-800">
-                            {muc.daXong}/{muc.siSo}
-                          </span>
-                        </div>
-                        <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full rounded-full transition-all ${
-                              muc.tiLe === 100 && muc.siSo > 0 ? "bg-emerald-500" : "bg-[#0284c7]"
-                            }`}
-                            style={{ width: `${muc.tiLe}%` }}
-                          />
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              {/* NÚT VÀO TỔ CHÍNH XÁC */}
-              <Link
-                href={`/admin/diem-danh/to-truong/${item.toNum}`}
-                className="w-full py-2.5 rounded-xl bg-slate-100 hover:bg-[#0284c7] text-slate-800 hover:text-white text-xs font-bold text-center transition block cursor-pointer"
-              >
-                Vào Kiểm Tra Tổ {item.toNum}
-              </Link>
-            </div>
-          ))}
-        </div>
-
         {/* BẢNG TỔNG KẾT */}
-        <div className="bg-white border border-slate-200 rounded-3xl shadow-xs overflow-hidden">
+        <div className={styles.tableBlock}>
           <div className="p-5 border-b border-slate-100 flex items-center justify-between">
             <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-              Bảng Tổng Hợp Theo Tổ
+              Tổng hợp theo tổ
             </h3>
             <span className="text-xs font-bold text-sky-700 bg-sky-50 px-3 py-1 rounded-xl border border-sky-100">
               Tổng sĩ số: {members.length} thành viên
@@ -344,7 +271,7 @@ export default function TrangQuanLyToAdmin() {
             </table>
           </div>
         </div>
-      </main>
+      </div>
 
       {/* MODAL TẠO MỤC MỚI */}
       {isModalThemMuc && (

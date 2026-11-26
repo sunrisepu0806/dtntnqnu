@@ -3,13 +3,10 @@
 :root {
   --background: #f8fafc;
   --foreground: #0f172a;
-  --font-be-vietnam-pro: 'Be Vietnam Pro', sans-serif;
 }
 
-html,
-body,
-* {
-  font-family: 'Be Vietnam Pro', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+@theme inline {
+  --font-sans: var(--font-be-vietnam-pro), system-ui, sans-serif;
 }
 
 body {

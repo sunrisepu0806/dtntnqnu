@@ -7,7 +7,11 @@ export async function proxy(request: NextRequest) {
   const user = { role: String(payload?.role || ""), to: String(payload?.to || payload?.to_id || "") };
   const home = payload?.sid ? homeFor(user) : null;
   if (!home) {
-    const response = NextResponse.redirect(new URL("/", request.url));
+    const login = new URL("/", request.url);
+    if (["/admin/thanh-vien", "/admin/xuat-danh-sach"].includes(request.nextUrl.pathname)) {
+      login.searchParams.set("next", request.nextUrl.pathname + request.nextUrl.search);
+    }
+    const response = NextResponse.redirect(login);
     response.cookies.delete("access_token");
     response.cookies.delete("token");
     return response;

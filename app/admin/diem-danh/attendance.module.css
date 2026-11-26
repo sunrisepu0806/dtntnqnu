@@ -1,0 +1,126 @@
+.shortcutsHeading .pendingLink, .textButton, .trail a {
+  display: inline-flex; align-items: center; gap: 6px;
+  color: #205aa8; font-size: 12px; font-weight: 600;
+}
+.shortcutsHeading svg, .continueButton svg { width: 15px; height: 15px; flex: none; }
+.shortcutsHeading .pendingLink { width: auto; padding-inline: 5px; }
+.pendingLink span { font-variant-numeric: tabular-nums; }
+.textButton:hover, .pendingLink:hover, .trail a:hover { text-decoration: underline; }
+.shortcutGrid { display: grid; gap: clamp(12px, 1.8vw, 26px); margin-top: 10px; }
+/* One row however many shortcuts the role sees (4 normally, 5 with the test-mode QR card). */
+.flowFolders { grid-auto-flow: column; grid-auto-columns: minmax(0, 245px); }
+.shortcutGrid .folderLink {
+  min-height: 112px; gap: 12px; padding: 25px 16px 14px; align-items: start; justify-content: space-between;
+}
+.shortcutGrid .folderLink:not([aria-current]) { --folder-color: var(--paper); color: #244c83; }
+.shortcutGrid .folderLink[aria-current] { --folder-color: var(--blue); color: white; }
+.compactShortcuts { margin-top: 10px; }
+.compactShortcuts .flowFolders { margin-top: 3px; }
+.compactShortcuts .shortcutsHeading { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); }
+.compactShortcuts .folderLink { flex-direction: row; align-items: center; justify-content: start; min-height: 68px; gap: 8px; padding: 21px 12px 9px; }
+.compactShortcuts .folderText small { display: none; }
+.compactShortcuts .folderText strong { text-wrap: balance; }
+.folderIcon, .rowIcon { display: inline-grid; place-items: center; flex: none; width: 31px; height: 31px; border-radius: 9px; color: #255ba7; background: #dde8f7; }
+.folderIcon svg, .rowIcon svg { width: 18px; height: 18px; }
+.folderIcon[data-icon=team] { background: #daf0e7; color: #28725b; }
+.folderIcon[data-icon=list] { background: #e9e2f5; color: #7051a0; }
+.folderIcon[data-icon=file] { background: #f7e7cd; color: #88591d; }
+.folderLink[aria-current] .folderIcon { color: white; background: #ffffff26; }
+.folderText, .rowText { display: grid; gap: 3px; min-width: 0; overflow-wrap: anywhere; }
+.folderText strong { font-size: 14px; font-weight: 650; }
+.folderText small, .rowText small { font-size: 12px; color: var(--muted); line-height: 1.45; }
+.folderLink[aria-current] small { color: #e3eeff; }
+
+.choices { display: grid; grid-template-columns: 1.12fr 1fr; gap: clamp(22px, 3.6vw, 68px); margin-top: 33px; }
+.step { min-width: 0; scroll-margin-block-start: 14px; }
+.step:focus { outline: none; }
+.step:focus-visible h2 { text-decoration: underline; text-decoration-color: #8bb7ec; text-underline-offset: 4px; }
+.stepHeading { display: flex; gap: 8px; justify-content: space-between; align-items: center; min-height: 39px; padding-bottom: 8px; border-bottom: 1px solid #edf0f5; }
+.stepHeading h2 { display: flex; align-items: center; gap: 8px; font-size: 16px; color: var(--ink); font-weight: 650; }
+.stepNumber { display: inline-grid; place-items: center; width: 23px; height: 23px; border-radius: 7px; color: #205ba8; background: #eaf1fb; font-size: 12px; }
+.stepHeading > span, .selectedName { color: var(--muted); font-size: 12px; }
+.selectedName { margin: 13px 0 5px; overflow-wrap: anywhere; }
+.filters { display: flex; flex-wrap: wrap; gap: 4px; margin: 10px 0 4px; }
+.filters button { min-height: 36px; padding: 4px 11px; border-radius: 7px; color: var(--muted); font-size: 12px; }
+.filters button[aria-pressed=true] { color: #1958ad; background: #edf3fd; font-weight: 650; }
+.list { display: grid; }
+.list button {
+  display: flex; align-items: center; gap: 10px; min-height: 54px; width: 100%; padding: 8px 10px;
+  border-bottom: 1px solid #eff2f5; text-align: left; color: var(--ink);
+}
+.list button:hover { background: #f4f7fc; }
+.list button[aria-pressed=true] { background: #e8f0ff; color: #174c99; }
+.rowText strong { font-size: 13px; font-weight: 600; }
+.list button > svg { margin-left: auto; width: 16px; height: 16px; flex: none; color: #637b9b; }
+.radioDot { width: 15px; height: 15px; flex: none; border: 1px solid #95a8bd; border-radius: 50%; }
+.list button[aria-pressed=true] .radioDot { border: 5px solid var(--blue); background: white; }
+.empty { padding: 16px 0; color: var(--muted); font-size: 13px; line-height: 1.65; }
+.textButton { min-height: 36px; margin-right: 12px; }
+.continueButton {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; margin-top: 16px;
+  min-height: 38px; padding: 8px 15px; border-radius: 8px; background: var(--blue); color: white; font-size: 13px; font-weight: 600;
+}
+.continueButton:hover:not(:disabled) { background: #184fa6; }
+.continueButton:disabled { color: #647589; background: #edf0f5; }
+
+.trail { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
+.trail svg { width: 13px; height: 13px; }
+.subpage { min-width: 0; color: var(--ink); }
+.subpage > div, .subpage > section { min-height: 0; max-width: none; margin-inline: 0; padding: 0; background-color: white; font-family: inherit; }
+.subpage > div > header, .subpage :global(.scanner-heading) {
+  position: relative; inset: auto; z-index: 2; margin: 0 0 17px; padding: 0 0 12px;
+  border: 0; border-bottom: 1px solid #edf0f5; background: white; box-shadow: none;
+}
+.subpage :global(.desk-toolbar), .pageHeader { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
+.subpage h1 { font-size: clamp(21px, 1.85vw, 27px); font-weight: 700; line-height: 1.3; letter-spacing: -.025em; color: #1a5bb7; text-transform: none; overflow-wrap: anywhere; }
+.pageHeader p { margin-top: 4px; color: var(--muted); font-size: 12px; }
+.headerActions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.headerActions :is(a, button), .headerButton {
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  min-height: 36px; padding: 6px 12px; border-radius: 8px; background: #eef3fb; color: #205aa8; font-size: 12px; font-weight: 600;
+}
+.headerActions button:disabled { opacity: .55; }
+.subpage :global(.task-disclosure) { min-width: 0; }
+.subpage .body { min-width: 0; }
+.subpage section + .body { margin-top: 25px; }
+.unitHeading { color: var(--ink); font-size: 16px; font-weight: 650; margin-bottom: 0; }
+.subpage .tableBlock { overflow: hidden; min-width: 0; border-block-start: 1px solid #e8edf4; }
+.subpage .tableBlock > div:first-child { padding: 12px 4px; }
+.subpage .tableBlock table th { color: #536780; font-size: 12px; }
+.subpage .tableBlock table tr { border-color: #e9eef4; }
+.subpage .tableBlock tbody tr:hover { background-color: #f0f5fc; }
+.shortcutGrid.groups { grid-template-columns: repeat(auto-fit, minmax(min(135px, 100%), 1fr)); }
+.shortcutGrid.departments { grid-template-columns: repeat(2, minmax(0, 245px)); }
+.subpage :global(.scanner-setup) { max-width: 600px; margin-inline: 0; padding: 8px 0 0; border: 0; box-shadow: none; }
+.subpage :global(.scanner-selection) { background: #eef3fb; color: #244c83; border: 0; }
+.subpage :global(.scanner-setup-actions) button { background: var(--blue); border-radius: 8px; color: white; }
+.subpage :global(.scanner-practice) { width: fit-content; margin-top: 16px; font-size: 12px; font-weight: 500; color: #205aa8; }
+.subpage :global(.attendance-scanner) > section, .subpage :global(.attendance-scanner) > div > section { min-width: 0; }
+.subpage :global(.attendance-scanner) :is(select, input, textarea) { max-width: 100%; }
+
+@media (max-width: 760px) {
+  .choices { grid-template-columns: minmax(0, 1fr); gap: 22px; margin-top: 22px; }
+  .stepHeading { min-height: 34px; }
+  .shortcutGrid { gap: 8px; }
+  .shortcutGrid .folderLink { min-height: 86px; padding: 22px 9px 10px; gap: 6px; }
+  .folderIcon { width: 26px; height: 26px; border-radius: 7px; }
+  .folderIcon svg { width: 16px; height: 16px; }
+  .folderText strong { font-size: 12px; }
+  .flowFolders .folderText small { display: none; }
+  .shortcutsHeading .pendingLink, .filters button, .textButton, .continueButton, .headerActions :is(a,button), .headerButton { min-height: 44px; }
+  .headerActions { gap: 6px; }
+  .continueButton { width: 100%; }
+  .shortcutGrid.groups { grid-template-columns: repeat(auto-fit, minmax(min(120px, 100%), 1fr)); }
+}
+@media (max-width: 640px) {
+  .trail { grid-column: 1 / -1; grid-row: 2; }
+  .trail a { min-height: 40px; }
+  .trail:not(:has(a)) { display: none; }
+  .subpage h1 { font-size: 20px; }
+  .flowFolders { gap: 6px; }
+  .flowFolders .folderLink { padding-inline: 7px; justify-content: flex-start; }
+  .compactShortcuts .flowFolders .folderLink { flex-direction: column; align-items: start; min-height: 73px; gap: 3px; padding: 18px 7px 7px; }
+  .compactShortcuts .folderIcon { width: 22px; height: 22px; }
+  .compactShortcuts .folderText strong { font-size: 12px; }
+  .subpage > div > header { margin-bottom: 12px; }
+}

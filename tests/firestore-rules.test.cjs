@@ -13,7 +13,7 @@ const actors = {
 };
 before(async()=>{
  const [host, port] = (process.env.FIRESTORE_EMULATOR_HOST || '127.0.0.1:8185').split(':');
- env=await initializeTestEnvironment({projectId:'demo-webdtntn',firestore:{host,port:Number(port),rules:fs.readFileSync('firestore.candidate.rules','utf8')}});
+ env=await initializeTestEnvironment({projectId:'demo-webdtntn-tests',firestore:{host,port:Number(port),rules:fs.readFileSync('firestore.candidate.rules','utf8')}});
  await env.clearFirestore();
  await env.withSecurityRulesDisabled(async ctx=>{
   const db=ctx.firestore();
@@ -48,7 +48,7 @@ test('member edits preserve ID, counters and creation date; duplicate creates ar
  const assert = require('node:assert/strict');
  assert.equal(edited.name, 'Edited'); assert.equal(edited.soBuoiDiemDanh, 4);
  assert.equal(edited.role, 'Thành viên'); assert.equal(edited.createdAt.toMillis(), original.createdAt.toMillis());
- await deleteDoc(doc(store, 'users', 'test-member'));
+ await assertFails(deleteDoc(doc(store, 'users', 'test-member')));
 });
 test('anonymous and fabricated admin claims cannot read or write private data',async()=>{
  for(const ctx of [env.unauthenticatedContext(),env.authenticatedContext('fake',{role:'Quản trị viên',isAdmin:true})]){
@@ -89,7 +89,7 @@ test('department leaders read only their department and cannot directly award po
 });
 test('scanner reads needed data but all attendance writes must use server API',async()=>{
  const store=db('scanner');
- for(const col of ['users','activities','attendance'])await assertSucceeds(getDocs(collection(store,col)));
+ for(const col of ['users','attendance'])await assertSucceeds(getDocs(collection(store,col)));
  await assertFails(setDoc(doc(store,'attendance','fake'),{studentId:'u1'}));
  await assertFails(updateDoc(doc(store,'users','u1'),{soBuoiDiemDanh:1}));
  await assertFails(deleteDoc(doc(store,'users','u1')));
@@ -100,7 +100,7 @@ test('admin manages business data but cannot reintroduce plaintext credentials',
  await assertSucceeds(setDoc(doc(store,'users','new'),{name:'New',accessGroup:'1',accessDepartment:'su-kien'}));
  await assertFails(updateDoc(doc(store,'users','new'),{passwork:'12345'}));
  await assertFails(updateDoc(doc(store,'users','new'),{passwordHash:'hash'}));
- await assertSucceeds(deleteDoc(doc(store,'users','new')));
+ await assertFails(deleteDoc(doc(store,'users','new')));
  await assertSucceeds(setDoc(doc(store,'posts_activities','news'),{title:'News'}));
 });
 test('logout, expiry, account deletion and role change immediately revoke database access',async()=>{
@@ -112,4 +112,11 @@ test('logout, expiry, account deletion and role change immediately revoke databa
   await deleteDoc(doc(store,'admin_accounts','scanner'));
  });
  for(const id of ['group2','media','events','scanner'])await assertFails(getDoc(doc(db(id),'activities','a')));
+});
+
+test('registration profiles are private and activity deletion is server-only',async()=>{
+ const anonymous=env.unauthenticatedContext().firestore();
+ await assertFails(getDocs(collection(anonymous,'activity_registrations')));
+ await assertSucceeds(getDocs(collection(db('admin'),'activity_registrations')));
+ await assertFails(deleteDoc(doc(db('admin'),'activities','a')));
 });

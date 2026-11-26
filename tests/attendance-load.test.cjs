@@ -18,7 +18,7 @@ test('Firestore: 300 members, six workers, duplicate retries preserve exactly 30
   for (let i = 0; i < 300; i++) batch.set(db.collection('users').doc(`${prefix}-${i}`), { mssv: `${prefix}-${i}`, soBuoiDiemDanh: 0 });
   await batch.commit();
   const session = { user: { role: 'Quản trị viên', name: 'Test', mssv: prefix }, authVersion: 'v1', accountRef: actor, sessionRef };
-  const service = load('lib/attendance-service.ts', { 'server-only': {}, 'firebase-admin/firestore': { FieldValue }, '@/lib/firebase-admin': { adminDb: () => db }, '@/lib/server-session': { readSession: async () => session }, '@/lib/member-scope': load('lib/member-scope.ts') });
+  const service = load('lib/attendance-service.ts', { 'server-only': {}, 'firebase-admin/firestore': { FieldValue }, '@/lib/firebase-admin': { adminDb: () => db }, '@/lib/server-session': { readSessionClaims: async () => null, readSession: async () => session }, '@/lib/member-scope': load('lib/member-scope.ts') });
   const started = Date.now(); let cursor = 0; let duplicates = 0;
   try {
     await Promise.all(Array.from({ length: 6 }, async () => {

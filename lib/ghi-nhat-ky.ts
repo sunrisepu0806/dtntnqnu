@@ -18,7 +18,7 @@ export async function xacThucVe(tokenString: string): Promise<NhanDinhDanh | nul
   try {
     const { payload } = await jwtVerify(tokenString, JWT_SECRET);
     return payload as unknown as NhanDinhDanh;
-  } catch (error) {
+  } catch {
     return null; // Vé không hợp lệ hoặc hết hạn
   }
 }

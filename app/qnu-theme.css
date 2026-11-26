@@ -1,0 +1,121 @@
+/* Palette shared by the public entry, the authenticated shell and the pilot. */
+.design-v2 .qnu-theme {
+  --v2-ink: #183650;
+  --v2-muted: #536879;
+  --v2-canvas: #eff5fa;
+  --v2-primary: #155baa;
+  --v2-line: #d4e1eb;
+  --qnu-light: #f1f8ff;
+  --qnu-header: linear-gradient(110deg, #143451, #174b80);
+  --qnu-shadow: 0 4px 18px rgb(24 54 80 / 6%);
+  --foreground: var(--v2-ink);
+  --background: var(--v2-canvas);
+  --color-sky-50: var(--qnu-light);
+  --color-sky-600: var(--v2-primary);
+  --color-sky-700: var(--v2-primary);
+  --color-slate-50: var(--v2-canvas);
+  --color-slate-200: var(--v2-line);
+  --color-slate-600: var(--v2-muted);
+  --color-slate-800: var(--v2-ink);
+  --color-slate-900: var(--v2-ink);
+  background-color: var(--background);
+  color: var(--foreground);
+}
+
+.qnu-theme .v2-login-story { background: linear-gradient(110deg, #143451f2, #174b80ee); }
+.qnu-theme .v2-login-story :is(.v2-kicker, p, footer, .v2-login-brand span) { color: #d1e5f5; }
+.qnu-theme .v2-login-form input:not([type=checkbox]) { border-color: var(--v2-line); border-radius: 14px; }
+.qnu-theme .v2-signin { background: var(--v2-primary); border-radius: 14px; }
+.qnu-theme .v2-signin:hover { background: #114b8a; }
+.qnu-theme .v2-topbar {
+  background: var(--qnu-header);
+  border: 0;
+  border-radius: 0 0 24px 24px;
+  color: white;
+}
+.qnu-theme .v2-topbar :is(.v2-topbar-left strong, .v2-topbar-account strong) { color: white; }
+.qnu-theme .v2-topbar :is(.v2-topbar-eyebrow, .v2-topbar-account small) { color: #d1e5f5; }
+.qnu-theme .v2-topbar :is(.v2-avatar, .v2-menu-button, .v2-topbar-account button) {
+  background: #ffffff17;
+  border-color: #ffffff59;
+  color: white;
+}
+.qnu-theme .v2-sidebar { background: white; border-right: 1px solid var(--v2-line); }
+.qnu-theme .v2-sidebar :is(.v2-brand strong, .v2-sidebar-profile strong) { color: var(--v2-ink); }
+.qnu-theme .v2-sidebar :is(.v2-brand small, .v2-workspace-label, .v2-sidebar-bottom, .v2-sidebar-bottom small, .v2-sidebar-profile small) { color: var(--v2-muted); }
+.qnu-theme .v2-sidebar-profile { border-color: var(--v2-line); }
+.qnu-theme .v2-sidebar :is(.v2-avatar, .v2-logout) { background: var(--qnu-light); color: var(--v2-primary); border-color: var(--v2-line); }
+.qnu-theme :is(.v2-sidebar, .v2-mobile-menu) nav a { color: var(--v2-muted); border-radius: 14px; }
+.qnu-theme :is(.v2-sidebar, .v2-mobile-menu) nav a:is(:hover, [aria-current=page]) {
+  color: var(--v2-primary);
+  background: var(--qnu-light);
+  box-shadow: none;
+}
+.qnu-theme :is(.v2-sidebar, .v2-mobile-menu) nav a[aria-current=page] { font-weight: 700; }
+.qnu-theme .v2-mobile-menu { border-radius: 16px; margin: 4px 8px; }
+
+.design-v2 .qnu-theme .admin-content :is(.bg-white.rounded-2xl, .bg-white.rounded-3xl,
+  .attendance-choice-panel, .attendance-session-bar, .attendance-capture-panel,
+  .attendance-confirm-panel, .task-disclosure, .approval-filter-bar, .unified-filter-bar) {
+  background-color: white;
+  border-radius: 24px;
+  border-color: var(--v2-line);
+  box-shadow: var(--qnu-shadow);
+}
+.design-v2 .qnu-theme .admin-content :is(input:not([type=checkbox], [type=radio]), select, textarea) {
+  border-radius: 12px;
+  border-color: var(--v2-line);
+}
+.design-v2 .qnu-theme :focus-visible { outline: 3px solid #3982cb; outline-offset: 2px; }
+.design-v2 .qnu-theme .admin-content :is(input, select, textarea):focus-visible { outline-color: #3982cb; }
+.design-v2 .qnu-theme .admin-content table th { background: var(--qnu-light); color: var(--v2-muted); }
+.design-v2 .qnu-theme .admin-content tbody tr:hover { background: var(--qnu-light); }
+.design-v2 .qnu-theme .admin-content :is(.attendance-primary, .attendance-shortcuts a:first-child, button.bg-sky-600, button.bg-sky-700, a.bg-sky-700, a.bg-sky-600, .bg-\[\#1465b5\]:is(a,button)) {
+  background: var(--v2-primary);
+  color: white;
+  border-radius: 12px;
+  border-color: var(--v2-primary);
+}
+.design-v2 .qnu-theme .admin-content :is(.attendance-activity-option, .attendance-session-list button)[aria-pressed=true] {
+  background: var(--qnu-light);
+  border-color: var(--v2-primary);
+  box-shadow: inset 0 0 0 1px var(--v2-primary);
+}
+.design-v2 .qnu-theme :is(.workspace-tabs, .attendance-methods, .compact-segments) {
+  background: #e3edf6;
+  border: 0;
+  border-radius: 16px;
+  padding: 4px;
+  gap: 4px;
+}
+.design-v2 .qnu-theme .workspace-tabs > :is(a,button) { border-radius: 12px; padding-inline: 12px; }
+.design-v2 .qnu-theme :is(.workspace-tabs, .compact-segments, .attendance-methods) > button[aria-pressed=true] {
+  color: var(--v2-primary);
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 1px 4px #18365016;
+}
+.qnu-theme :is(.attendance-result-success, .attendance-open) { background: #dff2e9; color: #155440; }
+.design-v2 .qnu-theme .admin-content .pilot-workspace > header {
+  background: var(--qnu-header);
+  border-radius: 24px;
+  padding: clamp(15px, 2vw, 20px);
+  color: white;
+}
+.design-v2 .qnu-theme .admin-content .pilot-workspace header h1 { color: white; }
+
+@media (max-width: 767px) {
+  .qnu-theme .v2-topbar { min-height: 60px; padding-block: 8px; border-radius: 0 0 18px 18px; }
+  .qnu-theme .v2-menu-button { min-height: 44px; }
+  .qnu-theme .v2-bottom-nav {
+    inset: auto 10px max(8px, env(safe-area-inset-bottom));
+    background: white;
+    border: 1px solid var(--v2-line);
+    border-radius: 20px;
+    padding: 4px;
+    box-shadow: 0 4px 20px #18365024;
+  }
+  .qnu-theme .v2-bottom-nav a { color: var(--v2-muted); border-radius: 16px; padding: 4px; gap: 1px; }
+  .qnu-theme .v2-bottom-nav a[aria-current=page] { color: var(--v2-primary); background: var(--qnu-light); font-weight: 700; }
+  .design-v2 .qnu-theme .workspace-tabs > :is(a,button) { min-height: 44px; padding-inline: 6px; }
+}

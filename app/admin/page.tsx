@@ -1,8 +1,26 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
+import Link from "next/link";
+import { attendanceReviewPath } from "@/lib/permissions";
 import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+
+import { attendanceDay, vietnamDay } from "@/lib/attendance-day";
+import type { ActivitySession } from "@/lib/activity-model";
+import { WorkspaceIcon } from "@/components/admin/workspace-navigation";
+import AdminWorkspace from "./AdminWorkspace";
+import { searchKey } from "@/lib/search-text";
+import styles from "./overview.module.css";
+
+const pageSize = 10;
+const periods = [["all", "Tất cả thời gian"], ["this_month", "Tháng này"], ["last_month", "Tháng trước"]] as const;
+type Period = (typeof periods)[number][0];
+
+type OverviewActivity = {
+  date?: string;
+  sessions?: ActivitySession[];
+};
 
 interface Member {
   id: string;
@@ -10,31 +28,48 @@ interface Member {
   studentId: string;
   group: string;
   department: string;
-  sessions: number;
 }
 
 interface AttendanceRecord {
   studentId: string;
-  timestamp?: any;
+  activityId?: string;
+  sessionId?: string;
+  sessionDate?: string;
+  timestamp?: unknown;
+  createdAt?: unknown;
+  date?: unknown;
   points: number;
+}
+
+function TeamAvatar({ tone }: { tone: number }) {
+  return <i className={styles.teamAvatar} data-tone={tone} aria-hidden="true" />;
 }
 
 export default function AdminDashboardTongQuan() {
   const [members, setMembers] = useState<Member[]>([]);
   const [attendances, setAttendances] = useState<AttendanceRecord[]>([]);
   const [departmentTasks, setDepartmentTasks] = useState<AttendanceRecord[]>([]);
-  const [totalEvents, setTotalEvents] = useState(0);
+  const [activities, setActivities] = useState(new Map<string, OverviewActivity>());
+  const [calendarReady, setCalendarReady] = useState(false);
+  const [ledgerState, setLedgerState] = useState<Partial<Record<string, "ready" | "error">>>({});
+  const totalEvents = activities.size;
   const [loading, setLoading] = useState(true);
 
   // BỘ LỌC THỜI GIAN & TỔ
-  const [filterTime, setFilterTime] = useState<"all" | "this_month" | "last_month">("all");
+  const [filterTime, setFilterTime] = useState<Period>("all");
+  const [page, setPage] = useState(0);
+  const [flow,setFlow] = useState("group");
   const [filterGroup, setFilterGroup] = useState<string>("all");
+  const [search, setSearch] = useState("");
+  const [listView, setListView] = useState(false);
+  const [detailMember, setDetailMember] = useState<Member | null>(null);
+  const rowDialog = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
     // 1. Tải danh sách thành viên
     const unsubUsers = onSnapshot(collection(db, "users"), (snap) => {
       const list: Member[] = [];
-      snap.docs.forEach((d) => {
+      snap.docs.filter(d=>d.data().archived!==true).forEach((d) => {
         const data = d.data();
         const rawGroup = String(data.to || data.to_id || data.group || "").trim();
         const matchTo = rawGroup.match(/[1-5]/);
@@ -53,7 +88,6 @@ export default function AdminDashboardTongQuan() {
           studentId: String(data.mssv || data.studentId || d.id).trim(),
           group: matchTo ? matchTo[0] : "",
           department: dept,
-          sessions: Number(data.soBuoiDiemDanh ?? data.totalSessions ?? 0),
         });
       });
 
@@ -61,423 +95,219 @@ export default function AdminDashboardTongQuan() {
       setLoading(false);
     });
 
-    // 2. Tải bản ghi điểm danh
-    const unsubAtt = onSnapshot(collection(db, "attendance"), (snap) => {
-      const list: AttendanceRecord[] = [];
-      snap.docs.forEach((d) => {
-        const data = d.data();
-        list.push({
-          studentId: String(data.studentId || data.mssv || "").trim().toLowerCase(),
-          timestamp: data.timestamp || data.createdAt || data.date,
-          points: 1,
-        });
-      });
-      setAttendances(list);
-    });
-
-    // 3. Tải danh sách sự kiện
-    const unsubTasks = onSnapshot(collection(db, "department_tasks"), (snap) => {
-      setDepartmentTasks(snap.docs.map((document) => {
-        const data = document.data();
-        return { studentId: String(data.studentId || data.mssv || "").trim().toLowerCase(),
-          timestamp: data.timestamp || data.createdAt || data.date, points: Number(data.pointsAdded || 0) };
-      }));
-    });
     const unsubEvents = onSnapshot(collection(db, "activities"), (snap) => {
-      setTotalEvents(snap.size);
+      setActivities(new Map(snap.docs.map(doc => [doc.id, doc.data()])));
+      setCalendarReady(true);
     });
 
     return () => {
       unsubUsers();
-      unsubAtt();
+
       unsubEvents();
-      unsubTasks();
+
     };
   }, []);
 
-  const parseRecordDate = (ts: any): Date | null => {
-    if (!ts) return null;
-    if (typeof ts.toDate === "function") return ts.toDate();
-    if (ts instanceof Date) return ts;
-    if (typeof ts === "string" || typeof ts === "number") {
-      const d = new Date(ts);
-      if (!isNaN(d.getTime())) return d;
-    }
-    return null;
-  };
+  useEffect(() => {
+    // Only subscribe to the ledger currently displayed.
+    const unsubAtt = flow === "group" ? onSnapshot(collection(db, "attendance"), (snap) => {
+      const list: AttendanceRecord[] = [];
+      snap.docs.filter(d=>d.data().archived!==true).forEach((d) => {
+        const data = d.data();
+        list.push({
+          studentId: String(data.studentId || data.mssv || "").trim().toLowerCase(),
+          activityId: data.activityId, sessionId: data.sessionId, sessionDate: data.sessionDate,
+          date: data.date, timestamp: data.timestamp, createdAt: data.createdAt,
+          points: 1,
+        });
+      });
+      setAttendances(list);
+      setLedgerState(state => ({ ...state, group: "ready" }));
+    }, () => setLedgerState(state => ({ ...state, group: "error" }))) : () => {};
 
-  // TÍNH ĐIỂM DANH THEO BỘ LỌC
+    // 3. Tải danh sách sự kiện
+    const unsubTasks = flow === "department" ? onSnapshot(collection(db, "department_tasks"), (snap) => {
+      setDepartmentTasks(snap.docs.filter(d=>d.data().archived!==true).map((document) => {
+        const data = document.data();
+        return { studentId: String(data.studentId || data.mssv || "").trim().toLowerCase(),
+          activityId: data.activityId, sessionId: data.sessionId, sessionDate: data.sessionDate,
+          date: data.date, timestamp: data.timestamp, createdAt: data.createdAt, points: Number(data.pointsAdded || 0) };
+      }));
+      setLedgerState(state => ({ ...state, department: "ready" }));
+    }, () => setLedgerState(state => ({ ...state, department: "error" }))) : () => {};
+
+    return () => { unsubAtt(); unsubTasks(); };
+  }, [flow]);
   const attendanceFilteredMap = useMemo(() => {
-    // All-time totals retain initial/imported balances as well as awarded work.
-    if (filterTime === "all") return null;
-
     const map: Record<string, number> = {};
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-
-    [...attendances, ...departmentTasks].forEach((record) => {
-      if (!record.studentId) return;
-
-      const recDate = parseRecordDate(record.timestamp);
-      if (!recDate) {
-        return;
-      }
-
-      const rMonth = recDate.getMonth();
-      const rYear = recDate.getFullYear();
-
-      if (filterTime === "this_month") {
-        if (rMonth === currentMonth && rYear === currentYear) {
-          map[record.studentId] = (map[record.studentId] || 0) + record.points;
-        }
-      } else if (filterTime === "last_month") {
-        const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1;
-        const lastYear = currentMonth === 0 ? currentYear - 1 : currentYear;
-        if (rMonth === lastMonth && rYear === lastYear) {
-          map[record.studentId] = (map[record.studentId] || 0) + record.points;
-        }
-      }
-    });
-
+    const currentMonth = vietnamDay(new Date()).slice(0, 7);
+    const [year, month] = currentMonth.split("-").map(Number);
+    const previousMonth = new Date(Date.UTC(year, month - 2, 1)).toISOString().slice(0, 7);
+    const selectedMonth = filterTime === "last_month" ? previousMonth : currentMonth;
+    for (const record of flow === "group" ? attendances : departmentTasks) {
+      if (!record.studentId) continue;
+      if (filterTime !== "all" && attendanceDay(record, activities.get(record.activityId || "")).slice(0, 7) !== selectedMonth) continue;
+      map[record.studentId] = (map[record.studentId] || 0) + record.points;
+    }
     return map;
-  }, [attendances, departmentTasks, filterTime]);
+  }, [activities, attendances, departmentTasks, filterTime, flow]);
 
   // SỐ LIỆU TỔNG QUAN
   const tongSoThanhVien = members.length;
-  const tongLuotDiemDanh = members.reduce((sum, m) => sum + m.sessions, 0);
-
   // DỮ LIỆU BIỂU ĐỒ BAN CHUYÊN MÔN
   const soSuKien = members.filter((m) => m.department === "Sự kiện").length;
   const soTruyenThong = members.filter((m) => m.department === "Truyền thông").length;
-  const soChuaXepBan = members.filter((m) => m.department === "Chưa xếp ban").length;
 
   const pctSuKien = tongSoThanhVien > 0 ? (soSuKien / tongSoThanhVien) * 100 : 0;
   const pctTruyenThong = tongSoThanhVien > 0 ? (soTruyenThong / tongSoThanhVien) * 100 : 0;
-  const pctChuaXep = tongSoThanhVien > 0 ? (soChuaXepBan / tongSoThanhVien) * 100 : 0;
-
-  // DỮ LIỆU SĨ SỐ 5 TỔ
-  const siSo5To = useMemo(() => {
-    return ["1", "2", "3", "4", "5"].map((toNum) => ({
-      toNum,
-      count: members.filter((m) => m.group === toNum).length,
-    }));
-  }, [members]);
 
   // BẢNG XẾP HẠNG AN TOÀN
   const bxhHienThi = useMemo(() => {
-    let list = members.map((m) => {
-      const sid = m.studentId.toLowerCase();
-      let diem = m.sessions;
-
-      if (attendanceFilteredMap !== null) {
-        diem = attendanceFilteredMap[sid] || 0;
-      }
-
-      return {
-        ...m,
-        diemThiDua: diem,
-      };
-    });
-
-    if (filterGroup !== "all") {
-      list = list.filter((m) => m.group === filterGroup);
-    }
-
-    return list.sort((a, b) => b.diemThiDua - a.diemThiDua);
+    return members
+      .filter(member => filterGroup === "all" || member.group === filterGroup)
+      .map(member => ({ ...member, diemThiDua: attendanceFilteredMap[member.studentId.toLowerCase()] || 0 }))
+      .sort((a, b) => b.diemThiDua - a.diemThiDua)
+      // Equal counts share a rank (1, 2, 2, 4); members with no sessions are not ranked.
+      .map((member, index, list) => {
+        let first = index;
+        while (first > 0 && list[first - 1].diemThiDua === member.diemThiDua) first--;
+        return { ...member, rank: member.diemThiDua > 0 ? first + 1 : null };
+      });
   }, [members, attendanceFilteredMap, filterGroup]);
 
+  const results = useMemo(() => {
+    const key = searchKey(search);
+    return key ? bxhHienThi.filter(member => searchKey(member.fullName).includes(key) || member.studentId.toLowerCase().includes(key)) : bxhHienThi;
+  }, [bxhHienThi, search]);
+  const pageCount = Math.max(1, Math.ceil(results.length / pageSize));
+  const start = Math.min(page, pageCount - 1) * pageSize;
+  const rows = results.slice(start, start + pageSize);
+  const isGroup = flow === "group";
+  const ledgerReady = ledgerState[flow] === "ready" && (filterTime === "all" || calendarReady);
+  const departments = [
+    { label: "Sự kiện", count: soSuKien, percent: pctSuKien },
+    { label: "Truyền thông", count: soTruyenThong, percent: pctTruyenThong },
+  ];
+  const attendanceHref = isGroup ? "/admin/diem-danh" : "/admin/diem-danh/truong-ban";
+  const attendanceLabel = isGroup ? "Chọn ca điểm danh" : "Mở điểm danh mảng";
+  const folders = [
+    { href: attendanceHref, label: "Theo tổ", title: attendanceLabel, meta: calendarReady ? totalEvents + " hoạt động" : "Điểm danh", tones: [1, 2, 3, 4, 5] },
+    { href: attendanceReviewPath, label: "Phụ trách", title: "Duyệt đề nghị", meta: "Điểm danh", tones: [3, 1, 2] },
+    { href: "/admin/thanh-vien", label: "Toàn đội", title: "Hồ sơ thành viên", meta: loading ? "Nhân sự" : tongSoThanhVien + " thành viên", tones: [5, 4, 2, 1] },
+  ];
+
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 font-sans text-slate-800 select-none space-y-5 pb-28">
-      {/* HEADER TỔNG QUAN */}
-      <div className="bg-white border border-slate-200 rounded-3xl p-5 sm:p-6 shadow-xs">
-        <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight uppercase">
-          Bảng Điều Hành Đội Thanh Niên Tình Nguyện QNU
-        </h1>
-        <p className="text-xs text-slate-500 font-medium mt-1">
-          Tổng hợp dữ liệu thành viên, tỷ lệ nhân sự và bảng xếp hạng hoạt động toàn đội
-        </p>
-      </div>
-
-      {/* 4 CARD CHỈ SỐ */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
-        <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-xs">
-          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-            Tổng Thành Viên Đội
-          </span>
-          <div className="mt-1 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-black text-slate-900">
-              {loading ? "..." : tongSoThanhVien}
-            </span>
-            <span className="text-xs font-semibold text-slate-400">thành viên</span>
-          </div>
-        </div>
-
-        <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-xs">
-          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-            Chiến Dịch & Hoạt Động
-          </span>
-          <div className="mt-1 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-black text-emerald-600">
-              {loading ? "..." : totalEvents}
-            </span>
-            <span className="text-xs font-semibold text-slate-400">sự kiện</span>
-          </div>
-        </div>
-
-        <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-xs">
-          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-            Lượt Điểm Danh
-          </span>
-          <div className="mt-1 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-black text-[#0284c7]">
-              {loading ? "..." : tongLuotDiemDanh}
-            </span>
-            <span className="text-xs font-semibold text-slate-400">buổi</span>
-          </div>
-        </div>
-
-        <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-xs">
-          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-            Cơ Cấu Sinh Hoạt
-          </span>
-          <div className="mt-1 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-black text-amber-600">
-              5 Tổ
-            </span>
-            <span className="text-xs font-semibold text-slate-400">
-              ({members.filter((m) => m.group !== "").length} hoạt động)
-            </span>
-          </div>
+    <AdminWorkspace search={search} onSearch={value => { setSearch(value); setPage(0); }}
+      searchLabel="Tìm thành viên theo tên hoặc MSSV" onSearchSubmit={() => document.getElementById("overview-ranking")?.focus()}
+      attendanceHref={attendanceHref} attendanceLabel={attendanceLabel} departments={departments} memberCount={loading ? null : tongSoThanhVien}>
+      <div className={styles.titleRow}>
+        <h1>Tổng quan đội</h1>
+        <div className={styles.titleTools}>
+          <button type="button" aria-label="Dạng danh sách cho truy cập nhanh" aria-pressed={listView}
+            title="Đổi cách hiển thị truy cập nhanh" onClick={() => setListView(!listView)}><WorkspaceIcon name={listView ? "list" : "grid"} /></button>
         </div>
       </div>
 
-      {/* KHỐI BIỂU ĐỒ TRÒN VÀ TIẾN ĐỘ */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs space-y-3">
-          <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-2.5">
-            Tỷ Lệ Nhân Sự Ban Chuyên Môn
-          </h2>
-
-          <div className="flex flex-col sm:flex-row items-center justify-around gap-4 py-2">
-            <div className="relative w-32 h-32 shrink-0 flex items-center justify-center">
-              <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
-                <circle cx="18" cy="18" r="15.915" fill="transparent" stroke="#f1f5f9" strokeWidth="4" />
-                <circle
-                  cx="18"
-                  cy="18"
-                  r="15.915"
-                  fill="transparent"
-                  stroke="#0284c7"
-                  strokeWidth="4"
-                  strokeDasharray={`${pctSuKien} ${100 - pctSuKien}`}
-                  strokeDashoffset="0"
-                />
-                <circle
-                  cx="18"
-                  cy="18"
-                  r="15.915"
-                  fill="transparent"
-                  stroke="#10b981"
-                  strokeWidth="4"
-                  strokeDasharray={`${pctTruyenThong} ${100 - pctTruyenThong}`}
-                  strokeDashoffset={`${-pctSuKien}`}
-                />
-                <circle
-                  cx="18"
-                  cy="18"
-                  r="15.915"
-                  fill="transparent"
-                  stroke="#cbd5e1"
-                  strokeWidth="4"
-                  strokeDasharray={`${pctChuaXep} ${100 - pctChuaXep}`}
-                  strokeDashoffset={`${-(pctSuKien + pctTruyenThong)}`}
-                />
-              </svg>
-              <div className="absolute text-center">
-                <span className="text-sm font-black text-slate-900 block">{tongSoThanhVien}</span>
-                <span className="text-[9px] uppercase font-bold text-slate-400">TV</span>
-              </div>
-            </div>
-
-            <div className="space-y-2 text-xs w-full max-w-[200px]">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#0284c7]" />
-                  <span className="font-semibold text-slate-700">Ban Sự Kiện</span>
-                </div>
-                <span className="font-mono font-bold text-slate-900">
-                  {soSuKien} <span className="text-slate-400 text-[10px]">({pctSuKien.toFixed(0)}%)</span>
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#10b981]" />
-                  <span className="font-semibold text-slate-700">Truyền Thông</span>
-                </div>
-                <span className="font-mono font-bold text-slate-900">
-                  {soTruyenThong} <span className="text-slate-400 text-[10px]">({pctTruyenThong.toFixed(0)}%)</span>
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#cbd5e1]" />
-                  <span className="font-semibold text-slate-500">Chưa Xếp Ban</span>
-                </div>
-                <span className="font-mono font-bold text-slate-500">
-                  {soChuaXepBan} <span className="text-slate-400 text-[10px]">({pctChuaXep.toFixed(0)}%)</span>
-                </span>
-              </div>
-            </div>
-          </div>
+      <section className={styles.quickAccess} aria-labelledby="overview-quick">
+        <div className={styles.sectionHeading}>
+          <h2 id="overview-quick">Truy cập nhanh</h2>
+          <Link href="/admin/quan-ly" aria-label="Mở quản lý đội" title="Mở quản lý đội"><WorkspaceIcon name="next" /></Link>
         </div>
-
-        <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs space-y-3">
-          <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-2.5">
-            Phân Bổ Sĩ Số 5 Tổ Tình Nguyện
-          </h2>
-
-          <div className="space-y-2.5 pt-1 text-xs">
-            {siSo5To.map((t) => {
-              const pct = tongSoThanhVien > 0 ? (t.count / tongSoThanhVien) * 100 : 0;
-              return (
-                <div key={t.toNum} className="space-y-1">
-                  <div className="flex justify-between items-center text-[11px] font-bold">
-                    <span className="text-slate-700">TỔ {t.toNum}</span>
-                    <span className="font-mono text-slate-900">
-                      {t.count} TV <span className="text-slate-400 font-normal">({pct.toFixed(0)}%)</span>
-                    </span>
-                  </div>
-                  <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-[#0284c7] transition-all"
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+        <div className={styles.shelf} data-list={listView}>
+          {folders.map(folder => (
+            <Link href={folder.href} key={folder.href} className={styles.folder}>
+              <span className={styles.cardLabel}>{folder.label}</span>
+              <span className={styles.avatars} aria-hidden="true">{folder.tones.map(tone => <TeamAvatar key={tone} tone={tone} />)}</span>
+              <span className={styles.cardFoot}><small>{folder.meta}</small><strong>{folder.title}</strong></span>
+            </Link>
+          ))}
         </div>
-      </div>
+      </section>
 
-      {/* BẢNG XẾP HẠNG HOẠT ĐỘNG */}
-      <div className="bg-white border border-slate-200 rounded-3xl shadow-xs overflow-hidden">
-        <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-          <div>
-            <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
-              Bảng Xếp Hạng Hoạt Động
-            </h2>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Thống kê số buổi tham gia của thành viên toàn đội
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="inline-flex rounded-xl bg-slate-100 p-1 text-xs font-bold">
-              <button
-                type="button"
-                onClick={() => setFilterTime("all")}
-                className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
-                  filterTime === "all" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-900"
-                }`}
-              >
-                Tất cả
-              </button>
-              <button
-                type="button"
-                onClick={() => setFilterTime("this_month")}
-                className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
-                  filterTime === "this_month" ? "bg-white text-[#0284c7] shadow-xs" : "text-slate-500 hover:text-slate-900"
-                }`}
-              >
-                Tháng này
-              </button>
-              <button
-                type="button"
-                onClick={() => setFilterTime("last_month")}
-                className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
-                  filterTime === "last_month" ? "bg-white text-[#0284c7] shadow-xs" : "text-slate-500 hover:text-slate-900"
-                }`}
-              >
-                Tháng trước
-              </button>
+      <section className={styles.leaderboard} aria-labelledby="overview-ranking">
+        <div className={styles.boardToolbar}>
+          <h2 id="overview-ranking" tabIndex={-1}>Bảng xếp hạng</h2>
+          <div className={styles.filters}>
+            <div role="group" className={styles.flow} aria-label="Luồng điểm danh">
+              {([["group", "Hoạt động"], ["department", "Mảng"]] as const).map(([key, label]) => (
+                <button type="button" key={key} aria-label={key === "group" ? "Điểm danh hoạt động" : "Điểm danh mảng"}
+                  aria-pressed={flow === key} onClick={() => { setFlow(key); setPage(0); }}>{label}</button>
+              ))}
             </div>
-
-            <select
-              value={filterGroup}
-              onChange={(e) => setFilterGroup(e.target.value)}
-              className="bg-slate-100 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-700 outline-none cursor-pointer focus:bg-white focus:border-[#0284c7]"
-            >
-              <option value="all">Toàn Đội (5 Tổ)</option>
-              <option value="1">Tổ 1</option>
-              <option value="2">Tổ 2</option>
-              <option value="3">Tổ 3</option>
-              <option value="4">Tổ 4</option>
-              <option value="5">Tổ 5</option>
+            <select aria-label="Thời gian thống kê" value={filterTime} onChange={event => { setFilterTime(event.target.value as Period); setPage(0); }}>
+              {periods.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+            </select>
+            <select aria-label="Lọc theo tổ" value={filterGroup} onChange={event => { setFilterGroup(event.target.value); setPage(0); }}>
+              <option value="all">Toàn đội</option>
+              {["1", "2", "3", "4", "5"].map(toNum => <option key={toNum} value={toNum}>Tổ {toNum}</option>)}
             </select>
           </div>
         </div>
+        {ledgerReady && results.length > 0 && results.every(member => member.rank === null) &&
+          <p className={styles.boardNotice} role="status">Chưa có ai được ghi nhận buổi điểm danh trong khoảng thời gian này, nên chưa xếp hạng.</p>}
+        <table className={styles.ranking} aria-labelledby="overview-ranking">
+          <thead><tr>
+            <th colSpan={2} scope="colgroup">Thành viên</th><th className={styles.unitCol} scope="col">Tổ / Ban</th>
+            <th className={styles.idCol} scope="col">Mã sinh viên</th><th scope="col">Số buổi</th><th scope="col"><span className={styles.srOnly}>Thao tác</span></th>
+          </tr></thead>
+          <tbody>
+            {ledgerReady && rows.map(member => {
+              const profileHref = "/admin/thanh-vien?member=" + encodeURIComponent(member.id);
+              const tone = Number(member.group) || 1;
+              return (
+                <tr key={member.id}>
+                  <td className={styles.rankCell}>{member.rank === null
+                    ? <span className={styles.rankNone} title="Chưa có buổi điểm danh">–</span>
+                    : <span className={styles.rankNumber} data-tone={tone} title={"Hạng " + member.rank}>{member.rank}</span>}</td>
+                  <td className={styles.nameCell}>
+                    <Link href={profileHref} prefetch={false}>{member.fullName}</Link>
+                    <small>{[member.studentId, member.group && "Tổ " + member.group].filter(Boolean).join(" · ")}</small>
+                  </td>
+                  <td className={styles.unitCol}><span className={styles.unit}><TeamAvatar tone={tone} /><span>{member.group ? "Tổ " + member.group : "Chưa xếp tổ"}<small>{member.department}</small></span></span></td>
+                  <td className={styles.idCol}>{member.studentId}</td>
+                  <td>{member.diemThiDua}</td>
+                  <td><div className={styles.rowActions}>
+                    <Link href={profileHref} prefetch={false} aria-label={"Mở hồ sơ " + member.fullName} title="Mở hồ sơ"><WorkspaceIcon name="link" /></Link>
+                    <button type="button" aria-label={"Tùy chọn cho " + member.fullName} title="Tùy chọn thành viên" onClick={() => {
+                      setDetailMember(member);
+                      rowDialog.current?.showModal();
+                    }}><WorkspaceIcon name="more" /></button>
+                  </div></td>
+                </tr>
+              );
+            })}
+            {(!ledgerReady || rows.length === 0) && <tr><td colSpan={6} className={styles.empty}>
+              {ledgerState[flow] === "error" ? "Không tải được số buổi điểm danh." : loading || !ledgerReady ? "Đang tải bảng xếp hạng…" : search ? "Không tìm thấy thành viên phù hợp." : "Chưa có thành viên trong danh sách này."}
+            </td></tr>}
+          </tbody>
+        </table>
+        {ledgerReady && <div className={styles.pagination}>
+          <span aria-live="polite">{results.length ? (start + 1) + "–" + (start + rows.length) + " / " + results.length : "0 thành viên"}</span>
+          {pageCount > 1 && <>
+            <button type="button" disabled={start === 0} onClick={() => setPage(start / pageSize - 1)}>Trước</button>
+            <button type="button" disabled={start / pageSize + 1 >= pageCount} onClick={() => setPage(start / pageSize + 1)}>Sau</button>
+          </>}
+        </div>}
+      </section>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse whitespace-nowrap">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-400 uppercase">
-                <th className="px-5 py-3 text-center w-14">Hạng</th>
-                <th className="px-5 py-3">Họ và Tên</th>
-                <th className="px-5 py-3">MSSV</th>
-                <th className="px-5 py-3">Đơn Vị</th>
-                <th className="px-5 py-3">Ban Chuyên Môn</th>
-                <th className="px-5 py-3 text-right">Số Buổi</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-              {loading ? (
-                <tr>
-                  <td colSpan={6} className="text-center py-12 text-slate-400">
-                    Đang nạp bảng xếp hạng...
-                  </td>
-                </tr>
-              ) : bxhHienThi.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="text-center py-12 text-slate-400">
-                    Chưa có thành viên nào
-                  </td>
-                </tr>
-              ) : (
-                bxhHienThi.map((m, idx) => (
-                  <tr key={m.id} className="hover:bg-slate-50/70 transition">
-                    <td className="px-5 py-3.5 text-center font-bold font-mono">
-                      {idx + 1 <= 3 ? (
-                        <span className="font-black text-[#0284c7] text-sm">{idx + 1}</span>
-                      ) : (
-                        <span className="text-slate-400 text-xs">{idx + 1}</span>
-                      )}
-                    </td>
-                    <td className="px-5 py-3.5 font-bold text-slate-900 uppercase">
-                      {m.fullName}
-                    </td>
-                    <td className="px-5 py-3.5 font-mono font-bold text-[#0284c7]">
-                      {m.studentId}
-                    </td>
-                    <td className="px-5 py-3.5 text-slate-600 font-semibold">
-                      {m.group ? `Tổ ${m.group}` : "—"}
-                    </td>
-                    <td className="px-5 py-3.5 text-slate-600">
-                      {m.department}
-                    </td>
-                    <td className="px-5 py-3.5 text-right font-mono font-bold text-emerald-600 text-sm">
-                      {m.diemThiDua} buổi
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
+      <p className={styles.note}>Số buổi tính từ lượt đã ghi nhận. Đề nghị chờ duyệt, lượt đã lưu trữ và số dư nhập cũ được theo dõi riêng.</p>
+
+      <dialog ref={rowDialog} className={styles.dialog} aria-labelledby="overview-member-heading"
+        onClick={event => { if (event.target === event.currentTarget) rowDialog.current?.close(); }}>
+        {detailMember && <div>
+          <div className={styles.dialogHeading}><h2 id="overview-member-heading">{detailMember.fullName}</h2>
+            <button type="button" aria-label="Đóng" onClick={() => rowDialog.current?.close()}><WorkspaceIcon name="close" /></button>
+          </div>
+          <p className={styles.memberMeta}>{[detailMember.studentId, detailMember.group && "Tổ " + detailMember.group, detailMember.department].filter(Boolean).join(" · ")}</p>
+          <Link className={styles.dialogAction} href={"/admin/thanh-vien?member=" + encodeURIComponent(detailMember.id)} prefetch={false}>Xem hồ sơ</Link>
+          {detailMember.group && <button type="button" className={styles.dialogSecondary} onClick={() => {
+            setFilterGroup(detailMember.group);
+            setSearch("");
+            setPage(0);
+            rowDialog.current?.close();
+          }}>Xem bảng xếp hạng Tổ {detailMember.group}</button>}
+        </div>}
+      </dialog>
+    </AdminWorkspace>
   );
 }

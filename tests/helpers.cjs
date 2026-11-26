@@ -7,7 +7,7 @@ function load(file, mocks = {}, globals = {}) {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
   }).outputText;
   const context = { exports: {}, Buffer, TextEncoder, URL, Date, console, process,
-    require: name => name in mocks ? mocks[name] : require(name), ...globals };
+    require: name => name in mocks ? mocks[name] : name === "@/lib/activity-model" ? load("lib/activity-model.ts") : require(name), ...globals };
   // Use this realm so the Firestore SDK recognizes plain objects constructed by the source.
   const evaluate = vm.runInThisContext(`(function(${Object.keys(context).join(',')}) {\n${code}\n})`, { filename: file });
   evaluate(...Object.values(context));

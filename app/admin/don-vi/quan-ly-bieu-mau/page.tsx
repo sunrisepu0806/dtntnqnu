@@ -1,8 +1,8 @@
 'use client';
+import NextImage from "next/image";
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { 
   collection, 
   setDoc, 
@@ -11,7 +11,6 @@ import {
   updateDoc, 
   doc, 
   serverTimestamp,
-  getDocs 
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
@@ -37,31 +36,15 @@ export interface ActivityFormItem {
   maxParticipants: number;
   isOpen: boolean;
   questions: FormQuestion[];
-  createdAt?: any;
-}
-
-export interface RegistrationRecord {
-  id: string;
-  activityId: string;
-  activityTitle?: string;
-  studentId: string;
-  fullName: string;
-  major: string;
-  group?: string;
-  phone: string;
-  dob?: string;
-  answers?: { [key: string]: any };
-  registeredAt?: any;
+  createdAt?: import("firebase/firestore").Timestamp;
 }
 
 export default function QuanLyBieuMauPage() {
-  const router = useRouter();
   const [formsList, setFormsList] = useState<ActivityFormItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCompressing, setIsCompressing] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [isExporting, setIsExporting] = useState<string | null>(null);
 
   // State Form khởi tạo
   const [title, setTitle] = useState('');
@@ -74,7 +57,7 @@ export default function QuanLyBieuMauPage() {
   const [maxParticipants, setMaxParticipants] = useState<number>(0);
   const [questions, setQuestions] = useState<FormQuestion[]>([
     {
-      id: `q_${Date.now()}_1`,
+      id: "initial-session-question",
       type: 'checkbox',
       title: 'Chọn ca / buổi bạn có thể tham gia',
       required: true,
@@ -285,11 +268,9 @@ export default function QuanLyBieuMauPage() {
       await setDoc(doc(db, 'activity_forms', sharedDocId), payload);
 
       alert('Đã tạo biểu mẫu thành công!');
-      // Điều hướng chuẩn theo route cơ cấu đơn vị
-      router.push(`/admin/don-vi/quan-ly-bieu-mau/${sharedDocId}`);
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
-      alert(`Lỗi: ${err.message || 'Không thể tạo biểu mẫu'}`);
+      alert(`Lỗi: ${(err instanceof Error ? err.message : String(err)) || 'Không thể tạo biểu mẫu'}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -298,8 +279,8 @@ export default function QuanLyBieuMauPage() {
   const handleToggleOpen = async (id: string, currentStatus: boolean) => {
     try {
       await updateDoc(doc(db, 'activity_forms', id), { isOpen: !currentStatus });
-    } catch (err: any) {
-      alert('Lỗi cập nhật: ' + err.message);
+    } catch (err) {
+      alert('Lỗi cập nhật: ' + (err instanceof Error ? err.message : String(err)));
     }
   };
 
@@ -308,8 +289,8 @@ export default function QuanLyBieuMauPage() {
     try {
       await deleteDoc(doc(db, 'activity_forms', id));
       alert('Đã xóa biểu mẫu thành công!');
-    } catch (err: any) {
-      alert('Lỗi xóa: ' + err.message);
+    } catch (err) {
+      alert('Lỗi xóa: ' + (err instanceof Error ? err.message : String(err)));
     }
   };
 
@@ -318,131 +299,6 @@ export default function QuanLyBieuMauPage() {
     navigator.clipboard.writeText(url);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
-  };
-
-  // Tải danh sách đơn đăng ký
-  const fetchRegistrationsForActivity = async (targetForm: ActivityFormItem): Promise<RegistrationRecord[]> => {
-    const [actRegSnap, regSnap] = await Promise.all([
-      getDocs(collection(db, 'activity_registrations')).catch(() => ({ docs: [] })),
-      getDocs(collection(db, 'registrations')).catch(() => ({ docs: [] })),
-    ]);
-
-    const combined: RegistrationRecord[] = [];
-    const seenIds = new Set<string>();
-    const targetTitle = (targetForm.title || '').trim().toLowerCase();
-
-    const processDoc = (docSnap: any) => {
-      const d = docSnap.data();
-      const sid = String(d.studentId || d.mssv || '').trim();
-      const actId = String(d.activityId || '').trim();
-      const actTitle = String(d.activityTitle || '').trim().toLowerCase();
-
-      const isMatch = actId === targetForm.id || (targetTitle && actTitle === targetTitle);
-
-      if (isMatch && sid && !seenIds.has(docSnap.id)) {
-        seenIds.add(docSnap.id);
-        combined.push({
-          id: docSnap.id,
-          activityId: d.activityId,
-          activityTitle: d.activityTitle || targetForm.title,
-          studentId: sid,
-          fullName: d.fullName || d.hoTen || '',
-          major: d.major || d.lopKhoa || '',
-          group: d.group || d.to || 'Tổ 1',
-          phone: d.phone || d.soDienThoai || '',
-          dob: d.dob || '',
-          answers: d.answers || (d.cauHoiKhaoSat ? { 'Ý kiến / Khảo sát': d.cauHoiKhaoSat } : {}),
-          registeredAt: d.registeredAt?.toDate?.()?.toLocaleString('vi-VN') || d.createdAt?.toDate?.()?.toLocaleString('vi-VN') || 'Chưa rõ',
-        });
-      }
-    };
-
-    actRegSnap.docs.forEach(processDoc);
-    regSnap.docs.forEach(processDoc);
-
-    return combined;
-  };
-
-  // Xuất file Excel (.xls)
-  const handleExportExcel = async (formItem: ActivityFormItem) => {
-    setIsExporting(formItem.id);
-    try {
-      const data = await fetchRegistrationsForActivity(formItem);
-
-      if (data.length === 0) {
-        alert('Chưa có thành viên nào đăng ký hoạt động này để xuất danh sách!');
-        setIsExporting(null);
-        return;
-      }
-
-      const questionCols = formItem.questions || [];
-
-      const tableHeaders = `
-        <tr style="background-color: #0284c7; color: #ffffff; font-weight: bold; text-align: center;">
-          <th style="border: 1px solid #cbd5e1; padding: 10px;">STT</th>
-          <th style="border: 1px solid #cbd5e1; padding: 10px;">MSSV</th>
-          <th style="border: 1px solid #cbd5e1; padding: 10px;">Họ và Tên</th>
-          <th style="border: 1px solid #cbd5e1; padding: 10px;">Ngành / Lớp</th>
-          <th style="border: 1px solid #cbd5e1; padding: 10px;">Tổ Sinh Hoạt</th>
-          <th style="border: 1px solid #cbd5e1; padding: 10px;">Số Điện Thoại</th>
-          <th style="border: 1px solid #cbd5e1; padding: 10px;">Ngày Sinh</th>
-          <th style="border: 1px solid #cbd5e1; padding: 10px;">Thời Gian Đăng Ký</th>
-          ${questionCols.map((q) => `<th style="border: 1px solid #cbd5e1; padding: 10px;">${q.title}</th>`).join('')}
-        </tr>
-      `;
-
-      const tableRows = data.map((reg, idx) => {
-        const ansMap = reg.answers || {};
-        const qAnswers = questionCols.map((q) => {
-          const val = ansMap[q.id];
-          if (Array.isArray(val)) return val.join(', ');
-          return val !== undefined && val !== null ? String(val) : '—';
-        });
-
-        return `
-          <tr style="background-color: ${idx % 2 === 0 ? '#ffffff' : '#f8fafc'};">
-            <td style="border: 1px solid #cbd5e1; padding: 8px; text-align: center;">${idx + 1}</td>
-            <td style="border: 1px solid #cbd5e1; padding: 8px; mso-number-format:'\\@'; text-align: center; font-weight: bold;">${reg.studentId}</td>
-            <td style="border: 1px solid #cbd5e1; padding: 8px; font-weight: bold;">${reg.fullName}</td>
-            <td style="border: 1px solid #cbd5e1; padding: 8px;">${reg.major}</td>
-            <td style="border: 1px solid #cbd5e1; padding: 8px; text-align: center;">${reg.group}</td>
-            <td style="border: 1px solid #cbd5e1; padding: 8px; mso-number-format:'\\@'; text-align: center;">${reg.phone}</td>
-            <td style="border: 1px solid #cbd5e1; padding: 8px; text-align: center;">${reg.dob || '—'}</td>
-            <td style="border: 1px solid #cbd5e1; padding: 8px; text-align: center;">${reg.registeredAt || '—'}</td>
-            ${qAnswers.map((ans) => `<td style="border: 1px solid #cbd5e1; padding: 8px;">${ans}</td>`).join('')}
-          </tr>
-        `;
-      }).join('');
-
-      const excelTemplate = `
-        <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-        <head>
-          <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-        </head>
-        <body>
-          <table style="border-collapse: collapse; font-family: Arial, sans-serif; font-size: 12px;">
-            ${tableHeaders}
-            ${tableRows}
-          </table>
-        </body>
-        </html>
-      `;
-
-      const blob = new Blob([excelTemplate], { type: 'application/vnd.ms-excel;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `Danh_Sach_${formItem.title.replace(/[\s/\\?%*:|"<>]/g, '_')}.xls`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    } catch (err: any) {
-      console.error('Lỗi khi xuất file:', err);
-      alert('Không thể xuất file. Vui lòng thử lại!');
-    } finally {
-      setIsExporting(null);
-    }
   };
 
   return (
@@ -461,7 +317,7 @@ export default function QuanLyBieuMauPage() {
             Quản Lý Biểu Mẫu Hoạt Động
           </h1>
           <p className="text-xs text-slate-500 font-medium mt-0.5">
-            Khởi tạo đơn đăng ký, khảo sát ca làm việc và xuất danh sách tình nguyện viên
+            Tạo biểu mẫu đăng ký và khảo sát ca làm việc
           </p>
         </div>
 
@@ -532,7 +388,7 @@ export default function QuanLyBieuMauPage() {
               </span>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <span className="text-[10px] font-bold text-slate-500 block mb-1">Bắt đầu nhận đơn</span>
+                  <span className="text-[11px] font-bold text-slate-500 block mb-1">Bắt đầu nhận đơn</span>
                   <input
                     type="datetime-local"
                     className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:border-[#0284c7]"
@@ -541,7 +397,7 @@ export default function QuanLyBieuMauPage() {
                   />
                 </div>
                 <div>
-                  <span className="text-[10px] font-bold text-slate-500 block mb-1">Hạn chót nhận đơn</span>
+                  <span className="text-[11px] font-bold text-slate-500 block mb-1">Hạn chót nhận đơn</span>
                   <input
                     type="datetime-local"
                     className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:border-[#0284c7]"
@@ -573,7 +429,7 @@ export default function QuanLyBieuMauPage() {
               <div className="p-3 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50 flex flex-col items-center justify-center relative overflow-hidden">
                 {bannerImage ? (
                   <div className="relative w-full aspect-[16/9] rounded-xl overflow-hidden">
-                    <img src={bannerImage} alt="Banner" className="w-full h-full object-cover" />
+                    <NextImage unoptimized width={800} height={600} src={bannerImage} alt="Banner" className="w-full h-full object-cover" />
                     <button
                       type="button"
                       onClick={() => setBannerImage('')}
@@ -667,7 +523,7 @@ export default function QuanLyBieuMauPage() {
                       <div className="space-y-1.5">
                         {(q.options || []).map((opt, optIdx) => (
                           <div key={optIdx} className="flex items-center gap-2">
-                            <span className="text-[10px] text-slate-400">•</span>
+                            <span className="text-[11px] text-slate-400">•</span>
                             <input
                               type="text"
                               className="flex-1 px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-xs"
@@ -683,7 +539,7 @@ export default function QuanLyBieuMauPage() {
                                 value={q.optionLimits?.[opt] || ''}
                                 onChange={(e) => handleUpdateOptionLimit(qIdx, opt, parseInt(e.target.value, 10) || 0)}
                               />
-                              <span className="text-[9px] text-slate-400 font-bold uppercase">người</span>
+                              <span className="text-[11px] text-slate-400 font-bold uppercase">người</span>
                             </div>
                             <button
                               type="button"
@@ -752,7 +608,7 @@ export default function QuanLyBieuMauPage() {
                     <h4 className="font-black text-slate-900 text-xs leading-snug line-clamp-2 uppercase">
                       {formItem.title}
                     </h4>
-                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase shrink-0 border ${
+                    <span className={`px-2 py-0.5 rounded-md text-[11px] font-black uppercase shrink-0 border ${
                       formItem.isOpen ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'
                     }`}>
                       {formItem.isOpen ? 'Đang mở' : 'Đã khóa'}
@@ -764,24 +620,6 @@ export default function QuanLyBieuMauPage() {
                       <span>🗓️ {formItem.dateStr || 'Chưa định ngày'}</span>
                       <span>👥 {formItem.maxParticipants > 0 ? `Chỉ tiêu: ${formItem.maxParticipants}` : 'Không giới hạn'}</span>
                     </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 pt-1">
-                    <Link
-                      href={`/admin/don-vi/quan-ly-bieu-mau/${formItem.id}`}
-                      className="py-2 px-3 bg-sky-50 hover:bg-sky-100 text-[#0284c7] font-bold rounded-xl text-xs text-center transition"
-                    >
-                      Xem DS Đăng Ký
-                    </Link>
-
-                    <button
-                      type="button"
-                      onClick={() => handleExportExcel(formItem)}
-                      disabled={isExporting === formItem.id}
-                      className="py-2 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold rounded-xl text-xs transition border border-emerald-200 cursor-pointer disabled:opacity-50 text-center"
-                    >
-                      {isExporting === formItem.id ? 'Đang xuất...' : 'Xuất Excel'}
-                    </button>
                   </div>
 
                   <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">

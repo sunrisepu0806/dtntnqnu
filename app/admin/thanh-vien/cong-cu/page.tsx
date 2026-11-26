@@ -2,32 +2,16 @@
 import { memberGroup, memberDepartment } from "@/lib/member-scope";
 
 import { useState, useEffect, useRef } from "react";
+import { WorkspaceIcon } from "@/components/admin/workspace-navigation";
+import styles from "../../sections.module.css";
+import { cleanId, directoryMembers, formatDobString, normalizeGroup, normalizeDepartment, type Member } from "@/lib/member-directory";
 import Link from "next/link";
 
 import QRCode from "qrcode";
-import {
-  collection,
-  onSnapshot,
-  doc,
-  writeBatch,
-  getDocs,
-  serverTimestamp,
-} from "firebase/firestore";
+import { collection, getDocsFromServer } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
-export interface Member {
-  id: string;
-  fullName: string;
-  studentId: string;
-  majorAndClass: string;
-  department: string;
-  group: string;
-  specialty: string;
-  dob: string;
-  avatarUrl?: string;
-  totalSessions: number;
-  totalPoints: number;
-}
+export type { Member } from "@/lib/member-directory";
 
 const EXPORT_LABELS: Record<string, string> = {
   avatarUrl: "Link Ảnh",
@@ -38,78 +22,25 @@ const EXPORT_LABELS: Record<string, string> = {
   specialty: "Mảng Chuyên Môn",
   group: "Tổ",
   dob: "Ngày Sinh",
-  totalSessions: "Số Buổi",
-  totalPoints: "Tổng Điểm",
+  totalSessions: "Buổi hoạt động",
+  totalPoints: "Buổi mảng",
   qrCode: "Mã QR",
 };
 
-const cleanId = (val: any) => String(val || "").trim().toLowerCase();
-
-const formatDobString = (dob: any) => {
-  if (!dob) return "";
-  const dobStr = String(dob).trim();
-  if (/^\d{5}$/.test(dobStr)) {
-    const serial = parseInt(dobStr, 10);
-    const date = new Date((serial - 25569) * 86400 * 1000);
-    const d = String(date.getUTCDate()).padStart(2, "0");
-    const m = String(date.getUTCMonth() + 1).padStart(2, "0");
-    const y = date.getUTCFullYear();
-    return `${d}/${m}/${y}`;
-  }
-  return dobStr;
-};
-
-const normalizeDepartment = (val: any): string => {
-  if (!val) return "";
-  const str = String(val).trim().toLowerCase();
-  if (
-    str.includes("truyền thông") ||
-    str.includes("tt") ||
-    str.includes("media") ||
-    str.includes("bantruyenthong")
-  ) {
-    return "Truyền thông";
-  }
-  if (
-    str.includes("sự kiện") ||
-    str.includes("sk") ||
-    str.includes("event") ||
-    str.includes("bansukien")
-  ) {
-    return "Sự kiện";
-  }
-  return String(val).trim();
-};
-
-const normalizeGroup = (val: any): string => {
-  if (!val) return "TNV";
-  const str = String(val).trim().toUpperCase();
-  if (str.includes("TNV") || str.includes("TỰ DO")) return "TNV";
-  const num = parseInt(str.replace(/[^0-9]/g, ""), 10);
-  if (num >= 1 && num <= 6) return String(num);
-  return "TNV";
-};
-
-const convertDriveToDirectLink = (url: string) => {
-  if (!url) return "";
-  const clean = url.trim();
-  const match = clean.match(/(?:id=|\/d\/)([a-zA-Z0-9_-]+)/);
-  if (match && match[1]) {
-    return `https://lh3.googleusercontent.com/d/${match[1]}`;
-  }
-  return clean;
-};
-
 export default function TrangCongCuThanhVien() {
+  const [tab, setTab] = useState<"Nhập Excel" | "Xuất báo cáo" | "Đối soát">("Nhập Excel");
+  const [requested, setRequested] = useState(false);
+  const [rosterReady, setRosterReady] = useState(false);
+  const [rosterError, setRosterError] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const [problem, setProblem] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [importPreview,setImportPreview]=useState<{rows:Record<string,unknown>[];revision:string;plan:{id:string;mssv:string;existing:boolean;changes:{field:string;from:unknown;to:unknown}[]}[]}|null>(null);
   const [members, setMembers] = useState<Member[]>([]);
-  const [activities, setActivities] = useState<any[]>([]);
-  const [attendanceRecords, setAttendanceRecords] = useState<any[]>([]);
 
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [thongBao, setThongBao] = useState<string | null>(null);
 
   const [exportGroupSelect, setExportGroupSelect] = useState("1");
@@ -131,66 +62,15 @@ export default function TrangCongCuThanhVien() {
   });
 
   useEffect(() => {
-    const unsubAct = onSnapshot(collection(db, "activities"), (snap) => {
-      setActivities(
-        snap.docs.map((d) => ({
-          id: d.id,
-          ...d.data(),
-          points: Number(d.data().points || 10),
-        }))
-      );
-    });
-
-    const unsubMem = onSnapshot(collection(db, "users"), (snap) => {
-      const list: Member[] = [];
-      const seen = new Set<string>();
-
-      snap.docs.forEach((docSnap) => {
-        const m = docSnap.data();
-        const sid = cleanId(m.studentId || m.mssv || docSnap.id);
-        if (!sid || seen.has(sid)) return;
-        seen.add(sid);
-
-        let dept = "";
-        if (Array.isArray(m.ban_id)) {
-          dept = m.ban_id.includes("bantruyenthong") ? "Truyền thông" : "Sự kiện";
-        } else {
-          dept = normalizeDepartment(m.department || m.ban || m.ban_id);
-        }
-
-        const specialty =
-          m.mangChuyenMon ||
-          m.specialty ||
-          (dept === "Sự kiện" ? "Hậu cần" : "Chụp ảnh");
-
-        list.push({
-          id: docSnap.id,
-          fullName: String(m.fullName || m.name || "").trim(),
-          studentId: String(m.studentId || m.mssv || docSnap.id).trim(),
-          majorAndClass: String(m.majorAndClass || "Chưa cập nhật").trim(),
-          department: dept,
-          specialty: specialty,
-          group: normalizeGroup(m.group || m.to || m.to_id),
-          dob: formatDobString(m.dob || m.ngaySinh),
-          avatarUrl: convertDriveToDirectLink(m.avatarUrl || m.linkDriveAnh || ""),
-          totalSessions: Number(m.soBuoiDiemDanh || 0),
-          totalPoints: Number(m.soBuoiDiemDanh || 0) * 10,
-        });
-      });
-
-      setMembers(list);
-    });
-
-    const unsubAtt = onSnapshot(collection(db, "attendance"), (snap) => {
-      setAttendanceRecords(snap.docs.map((d) => d.data()));
-    });
-
-    return () => {
-      unsubAct();
-      unsubMem();
-      unsubAtt();
-    };
-  }, []);
+    if (!requested) return;
+    let active = true;
+    getDocsFromServer(collection(db, "users")).then(snapshot => {
+      if (!active) return;
+      setMembers(directoryMembers(snapshot.docs.filter(d => !d.data().archived).map(d => ({ ...d.data(), id: d.id }))));
+      setRosterReady(true);
+    }).catch(() => { if (active) setRosterError(true); });
+    return () => { active = false; };
+  }, [requested, attempt]);
 
   // 1. Tải file mẫu Excel
   const downloadTemplate = async () => {
@@ -243,9 +123,10 @@ export default function TrangCongCuThanhVien() {
       a.href = url;
       a.download = "Mau_Nhap_Thanh_Vien_QNU.xlsx";
       a.click();
-      setThongBao("Đã tải xuống file mẫu Excel thành công!");
-    } catch (e) {
-      alert("Lỗi khi tạo file mẫu");
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setThongBao("Đã tải file mẫu Excel.");
+    } catch {
+      setProblem("Lỗi khi tạo file mẫu");
     }
   };
 
@@ -256,244 +137,83 @@ export default function TrangCongCuThanhVien() {
 
     setImporting(true);
     try {
-      const reader = new FileReader();
-      reader.onload = async (event) => {
-        try {
-          const data = new Uint8Array(event.target?.result as ArrayBuffer);
-          const XLSX = await import("xlsx");
-          const workbook = XLSX.read(data, {
-            type: "array",
-            codepage: 65001,
-            cellDates: true,
-          });
-          const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-          const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet, {
-            defval: "",
-            raw: false,
-            dateNF: "DD/MM/YYYY",
-          });
+      setImportPreview(null); setProblem(""); setThongBao(null);
+      const data = new Uint8Array(await file.arrayBuffer());
+      const XLSX = await import("xlsx");
+      const workbook = XLSX.read(data, {
+        type: "array",
+        codepage: 65001,
+        cellDates: true,
+      });
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData: Record<string,unknown>[] = XLSX.utils.sheet_to_json(worksheet, {
+        defval: "",
+        raw: false,
+        dateNF: "DD/MM/YYYY",
+      });
 
-          if (!jsonData || jsonData.length === 0) {
-            alert("Tệp Excel rỗng!");
-            setImporting(false);
-            return;
-          }
-
-          let insertedCount = 0;
-          let updatedCount = 0;
-          let errorCount = 0;
-
-          const processedInFile = new Set<string>();
-          const existingIds = new Set(members.map((m) => cleanId(m.studentId)));
-
-          const BATCH_SIZE = 450;
-          let batch = writeBatch(db);
-          let opCount = 0;
-
-          for (const row of jsonData) {
-            const normRow: any = {};
-            Object.keys(row).forEach((k) => {
-              normRow[k.toString().trim().toLowerCase().replace(/\s+/g, " ")] = row[k];
-            });
-
-            const fullName =
-              normRow["họ và tên"] || normRow["họ tên"] || normRow["fullname"] || "";
-            const studentId =
-              normRow["mã sinh viên"] || normRow["mã sv"] || normRow["mssv"] || "";
-            const majorAndClass =
-              normRow["ngành / lớp"] || normRow["ngành"] || "Chưa cập nhật";
-            const department = normalizeDepartment(normRow["ban"] || normRow["department"]);
-
-            const specialty =
-              normRow["mảng chuyên môn"] ||
-              normRow["mảng"] ||
-              normRow["mang chuyen mon"] ||
-              normRow["mang"] ||
-              normRow["specialty"] ||
-              (department === "Truyền thông" ? "Chụp ảnh" : "Hậu cần");
-
-            const group = normalizeGroup(normRow["tổ"] || normRow["group"]);
-            const dob = normRow["ngày sinh"] || normRow["dob"] || "";
-            const avatarUrl = convertDriveToDirectLink(
-              normRow["link ảnh"] || normRow["avatar"] || ""
-            );
-
-            const cleanSid = cleanId(studentId);
-
-            if (!fullName || !cleanSid || processedInFile.has(cleanSid)) {
-              errorCount++;
-              continue;
-            }
-            processedInFile.add(cleanSid);
-
-            const isExisting = existingIds.has(cleanSid);
-
-            const memberData: any = {
-              mssv: String(studentId).trim(),
-              name: String(fullName).trim(),
-              majorAndClass: String(majorAndClass).trim(),
-              accessGroup: memberGroup(group),
-              accessDepartment: memberDepartment(department),
-              to_id: group === "TNV" ? "tnv" : `to_${group}`,
-              ban_id: department === "Truyền thông" ? ["bantruyenthong"] : ["bansukien"],
-              mangChuyenMon: String(specialty).trim(),
-              ngaySinh: formatDobString(dob),
-              linkDriveAnh: String(avatarUrl).trim(),
-              updatedAt: serverTimestamp(),
-            };
-
-            if (!isExisting) {
-              memberData.soBuoiDiemDanh = 0;
-              memberData.createdAt = serverTimestamp();
-              insertedCount++;
-            } else {
-              updatedCount++;
-            }
-
-            const docRef = doc(db, "users", cleanSid);
-            batch.set(docRef, memberData, { merge: true });
-            opCount++;
-
-            if (opCount >= BATCH_SIZE) {
-              await batch.commit();
-              batch = writeBatch(db);
-              opCount = 0;
-            }
-          }
-
-          if (opCount > 0) {
-            await batch.commit();
-          }
-
-          setThongBao(
-            `Đã xử lý: Cập nhật ${updatedCount} thành viên, Thêm mới ${insertedCount} thành viên (Bỏ qua/Trùng trong file: ${errorCount})`
-          );
-        } catch (err) {
-          alert("Lỗi khi đọc hoặc đồng bộ file Excel");
-        } finally {
-          setImporting(false);
-          if (fileInputRef.current) fileInputRef.current.value = "";
-        }
-      };
-      reader.readAsArrayBuffer(file);
-    } catch (error) {
-      alert("Đã xảy ra sự cố khi tải tệp");
-      setImporting(false);
-    }
-  };
-
-  // 3. Xóa tất cả các buổi điểm danh (Reset số buổi về 0 & dọn dẹp collection attendance)
-  const handleResetAttendance = async () => {
-    const confirmAction = window.confirm(
-      "CẢNH BÁO: Thao tác này sẽ xóa toàn bộ lịch sử điểm danh và đặt số buổi điểm danh của TẤT CẢ thành viên về 0.\n\nBạn có chắc chắn muốn thực hiện?"
-    );
-    if (!confirmAction) return;
-
-    setIsDeleting(true);
-    try {
-      // Xóa collection attendance
-      const attSnap = await getDocs(collection(db, "attendance"));
-      let batch = writeBatch(db);
-      let opCount = 0;
-
-      for (const attDoc of attSnap.docs) {
-        batch.delete(doc(db, "attendance", attDoc.id));
-        opCount++;
-        if (opCount >= 450) {
-          await batch.commit();
-          batch = writeBatch(db);
-          opCount = 0;
-        }
+      if (!jsonData || jsonData.length === 0) {
+        setProblem("Tệp Excel rỗng!");
+        setImporting(false);
+        return;
       }
 
-      // Đặt lại soBuoiDiemDanh = 0 cho tất cả users
-      const usersSnap = await getDocs(collection(db, "users"));
-      for (const uDoc of usersSnap.docs) {
-        batch.update(doc(db, "users", uDoc.id), {
-          soBuoiDiemDanh: 0,
-          updatedAt: serverTimestamp(),
-        });
-        opCount++;
-        if (opCount >= 450) {
-          await batch.commit();
-          batch = writeBatch(db);
-          opCount = 0;
-        }
-      }
-
-      if (opCount > 0) {
-        await batch.commit();
-      }
-
-      setThongBao("Đã reset toàn bộ số buổi điểm danh về 0 thành công!");
-    } catch (error: any) {
-      alert("Lỗi khi reset điểm danh: " + error.message);
+      const rows = jsonData.map((row) => {
+        const norm: Record<string,unknown> = {};
+        Object.entries(row).forEach(([key,value])=>{norm[key.trim().toLowerCase().replace(/\s+/g," ")]=value;});
+        const pick=(...keys:string[])=>String(keys.map(k=>norm[k]).find(v=>v!==undefined&&String(v).trim())||"").trim();
+        const result:Record<string,unknown>={mssv:pick("mã sinh viên","mã sv","mssv")};
+        const fields:Record<string,string>={name:pick("họ và tên","họ tên","fullname"),majorAndClass:pick("ngành / lớp","ngành"),mangChuyenMon:pick("mảng chuyên môn","mảng","mang chuyen mon","mang","specialty"),ngaySinh:pick("ngày sinh","dob"),linkDriveAnh:pick("link ảnh","avatar")};
+        Object.entries(fields).forEach(([k,v])=>{if(v)result[k]=v;});
+        const group=pick("tổ","group"),department=pick("ban","department");
+        if(group){if(!/^(?:tổ\s*|to_)?[1-5]$/i.test(group)&&!/^tnv$/i.test(group))throw Error("Tổ phải từ 1 đến 5 hoặc TNV.");const g=normalizeGroup(group);result.accessGroup=memberGroup(g);result.to_id=g==="TNV"?"tnv":`to_${g}`;}
+        if(department){const d=normalizeDepartment(department);if(!["Sự kiện","Truyền thông"].includes(d))throw Error("Tên ban không hợp lệ.");result.accessDepartment=memberDepartment(d);result.ban_id=[d==="Truyền thông"?"bantruyenthong":"bansukien"];}
+        return result;
+      });
+      const response=await fetch("/api/admin/member-import",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({rows})});
+      const preview=await response.json();if(!response.ok)throw Error(preview.error);
+      setImportPreview({rows,...preview});
+    } catch (err) {
+      setProblem(err instanceof Error ? err.message : "Chưa đọc được file Excel.");
     } finally {
-      setIsDeleting(false);
+      setImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
-  // 4. Xóa toàn bộ danh sách thành viên (users) và lịch sử điểm danh tương ứng
-  const handleDeleteAllMembers = async () => {
-    const confirmName = window.prompt(
-      "CỰC KỲ NGUY HIỂM: Bạn đang chuẩn bị xóa TOÀN BỘ thành viên khỏi hệ thống!\nNhập chữ 'XOA HET' vào bên dưới để xác nhận:"
-    );
-    if (confirmName !== "XOA HET") {
-      if (confirmName !== null) alert("Mã xác nhận không đúng. Đã hủy thao tác.");
+  const hasExportColumns = Object.values(exportOptions).some(Boolean);
+  const groupMembers = members.filter(member => member.group === exportGroupSelect);
+  const rosterDisabled = exporting || !hasExportColumns || !members.length;
+
+  // Chỉ đọc lịch sử khi danh sách cần các cột số buổi.
+  const executeCustomExport = async (dataToExport: Member[], fileName: string) => {
+    if (!hasExportColumns || !dataToExport.length) {
+      setThongBao(hasExportColumns ? "Không có thành viên phù hợp để xuất." : "Chọn ít nhất một cột để xuất danh sách.");
       return;
     }
-
-    setIsDeleting(true);
-    try {
-      let batch = writeBatch(db);
-      let opCount = 0;
-
-      // Xóa toàn bộ users
-      const usersSnap = await getDocs(collection(db, "users"));
-      for (const uDoc of usersSnap.docs) {
-        batch.delete(doc(db, "users", uDoc.id));
-        opCount++;
-        if (opCount >= 450) {
-          await batch.commit();
-          batch = writeBatch(db);
-          opCount = 0;
-        }
-      }
-
-      // Xóa luôn attendance liên quan để tránh rác dữ liệu
-      const attSnap = await getDocs(collection(db, "attendance"));
-      for (const attDoc of attSnap.docs) {
-        batch.delete(doc(db, "attendance", attDoc.id));
-        opCount++;
-        if (opCount >= 450) {
-          await batch.commit();
-          batch = writeBatch(db);
-          opCount = 0;
-        }
-      }
-
-      if (opCount > 0) {
-        await batch.commit();
-      }
-
-      setThongBao("Đã xóa toàn bộ danh sách thành viên và điểm danh!");
-    } catch (error: any) {
-      alert("Lỗi khi xóa thành viên: " + error.message);
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
-  // 5. Xuất file tùy chọn có Mảng và mã QR
-  const executeCustomExport = async (dataToExport: Member[], fileName: string) => {
-    setExporting(true);
-    await new Promise((resolve) => setTimeout(resolve, 150));
-
+    setExporting(true); setProblem(""); setThongBao(null);
     try {
       const ExcelJS = (await import("exceljs")).default;
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet("DanhSach");
-      const cols: any[] = [];
+      const totals = new Map<string, { group: number; department: number }>();
+      if (exportOptions.totalSessions || exportOptions.totalPoints) {
+        const flow = exportOptions.totalSessions && exportOptions.totalPoints ? "" : exportOptions.totalSessions ? "?flow=group" : "?flow=department";
+        const response = await fetch("/api/attendance/ledger" + flow);
+        const data = await response.json();
+        if (!response.ok) throw Error(data.error || "Chưa đọc được lịch sử điểm danh.");
+        const byId = new Map(dataToExport.map(m => [m.id, m]));
+        const byStudent = new Map(dataToExport.map(m => [cleanId(m.studentId), m]));
+        for (const row of data.entries as { memberId:string; studentId:string; flow:"group" | "department"; points:number; archived:boolean }[]) {
+          const member = byId.get(row.memberId) || byStudent.get(cleanId(row.studentId));
+          if (row.archived || !member) continue;
+          const total = totals.get(member.id) || { group:0, department:0 };
+          total[row.flow] += row.points;
+          totals.set(member.id, total);
+        }
+      }
+
+      const cols: Partial<import("exceljs").Column>[] = [];
 
       if (exportOptions.avatarUrl) cols.push({ header: "LINK ẢNH", key: "avatarUrl", width: 35 });
       if (exportOptions.fullName) cols.push({ header: "HỌ VÀ TÊN", key: "fullName", width: 25 });
@@ -503,8 +223,8 @@ export default function TrangCongCuThanhVien() {
       if (exportOptions.specialty) cols.push({ header: "MẢNG CHUYÊN MÔN", key: "specialty", width: 22 });
       if (exportOptions.group) cols.push({ header: "TỔ", key: "group", width: 10 });
       if (exportOptions.dob) cols.push({ header: "NGÀY SINH", key: "dob", width: 15 });
-      if (exportOptions.totalSessions) cols.push({ header: "SỐ BUỔI", key: "totalSessions", width: 12 });
-      if (exportOptions.totalPoints) cols.push({ header: "TỔNG ĐIỂM", key: "totalPoints", width: 12 });
+      if (exportOptions.totalSessions) cols.push({ header: "BUỔI HOẠT ĐỘNG", key: "totalSessions", width: 12 });
+      if (exportOptions.totalPoints) cols.push({ header: "BUỔI MẢNG", key: "totalPoints", width: 12 });
       if (exportOptions.qrCode) cols.push({ header: "MÃ QR", key: "qrCode", width: 18 });
 
       worksheet.columns = cols;
@@ -512,17 +232,17 @@ export default function TrangCongCuThanhVien() {
       if (dobColIdx !== -1) worksheet.getColumn(dobColIdx + 1).numFmt = "@";
 
       for (const m of dataToExport) {
-        const rowData: any = {};
+        const rowData: Record<string,import("exceljs").CellValue> = {};
         if (exportOptions.avatarUrl) rowData.avatarUrl = m.avatarUrl || "";
         if (exportOptions.fullName) rowData.fullName = m.fullName;
         if (exportOptions.studentId) rowData.studentId = m.studentId;
         if (exportOptions.majorAndClass) rowData.majorAndClass = m.majorAndClass;
         if (exportOptions.department) rowData.department = m.department || "Chưa xếp ban";
-        if (exportOptions.specialty) rowData.specialty = m.specialty || "Hậu cần";
+        if (exportOptions.specialty) rowData.specialty = m.specialty || "Chưa phân mảng";
         if (exportOptions.group) rowData.group = m.group === "TNV" ? "TNV" : `Tổ ${m.group}`;
         if (exportOptions.dob) rowData.dob = formatDobString(m.dob);
-        if (exportOptions.totalSessions) rowData.totalSessions = m.totalSessions;
-        if (exportOptions.totalPoints) rowData.totalPoints = m.totalPoints;
+        if (exportOptions.totalSessions) rowData.totalSessions = totals.get(m.id)?.group || 0;
+        if (exportOptions.totalPoints) rowData.totalPoints = totals.get(m.id)?.department || 0;
 
         const row = worksheet.addRow(rowData);
         row.height = exportOptions.qrCode ? 75 : 24;
@@ -554,422 +274,86 @@ export default function TrangCongCuThanhVien() {
       a.href = url;
       a.download = `${fileName}_${Date.now()}.xlsx`;
       a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
       setThongBao("Đã xuất file thành công!");
-    } catch (e: any) {
-      alert("Lỗi xuất file: " + e.message);
+    } catch (e) {
+      setProblem("Lỗi xuất file: " + (e instanceof Error ? e.message : String(e)));
     } finally {
       setExporting(false);
     }
   };
 
-  // 6. Xuất theo Tổ kèm Mảng và sheet lịch sử
-  const handleExportByGroup = async (group: string) => {
-    setExporting(true);
-    await new Promise((resolve) => setTimeout(resolve, 150));
-
-    try {
-      const groupMembers = members.filter((m) => String(m.group) === String(group));
-      const groupLabel = group === "TNV" ? "TNV" : `Tổ ${group}`;
-
-      if (groupMembers.length === 0) {
-        alert(`Không có thành viên nào thuộc ${groupLabel}`);
-        setExporting(false);
-        return;
-      }
-
-      const ExcelJS = (await import("exceljs")).default;
-      const workbook = new ExcelJS.Workbook();
-      const summarySheetName = `Tổng Hợp ${groupLabel}`.substring(0, 31);
-      const summaryWs = workbook.addWorksheet(summarySheetName);
-
-      summaryWs.columns = [
-        { header: "HỌ VÀ TÊN", key: "fullName", width: 25 },
-        { header: "MÃ SV", key: "studentId", width: 15 },
-        { header: "NGÀNH / LỚP", key: "majorAndClass", width: 30 },
-        { header: "BAN", key: "department", width: 15 },
-        { header: "MẢNG PHỤ TRÁCH", key: "specialty", width: 22 },
-        { header: "NGÀY SINH", key: "dob", width: 15 },
-        { header: "SỐ BUỔI", key: "totalSessions", width: 12 },
-        { header: "TỔNG ĐIỂM", key: "totalPoints", width: 12 },
-        { header: "LINK ẢNH", key: "avatarUrl", width: 35 },
-      ];
-
-      summaryWs.getColumn("dob").numFmt = "@";
-
-      groupMembers.forEach((m) => {
-        const row = summaryWs.addRow({
-          fullName: m.fullName,
-          studentId: m.studentId,
-          majorAndClass: m.majorAndClass,
-          department: m.department || "Chưa xếp ban",
-          specialty: m.specialty || "Hậu cần",
-          dob: formatDobString(m.dob),
-          totalSessions: m.totalSessions,
-          totalPoints: m.totalPoints,
-          avatarUrl: m.avatarUrl || "",
-        });
-        row.getCell("dob").numFmt = "@";
-      });
-
-      const sheetNames = new Set<string>();
-      sheetNames.add(summarySheetName);
-
-      groupMembers.forEach((member, index) => {
-        const safeName = (member.studentId || `TV_${index}`)
-          .replace(/[\\/?*[\]:]/g, "_")
-          .substring(0, 27);
-        let finalSheetName = safeName;
-        let counter = 1;
-
-        while (sheetNames.has(finalSheetName)) {
-          finalSheetName = `${safeName}_${counter}`;
-          counter++;
-        }
-        sheetNames.add(finalSheetName);
-
-        const ws = workbook.addWorksheet(finalSheetName);
-        ws.columns = [{ width: 30 }, { width: 35 }, { width: 15 }];
-
-        ws.addRow(["THÔNG TIN CÁ NHÂN", ""]);
-        ws.addRow(["Họ và tên:", member.fullName]);
-
-        const rId = ws.addRow(["MSSV:", member.studentId]);
-        rId.getCell(2).numFmt = "@";
-
-        ws.addRow(["Ban trực thuộc:", member.department || "Chưa xếp ban"]);
-        ws.addRow(["Mảng chuyên trách:", member.specialty || "Hậu cần"]);
-        ws.addRow(["Đơn vị:", member.group === "TNV" ? "TNV" : `Tổ ${member.group}`]);
-        ws.addRow(["Ngành / Lớp:", member.majorAndClass]);
-
-        const rDob = ws.addRow(["Ngày sinh:", formatDobString(member.dob)]);
-        rDob.getCell(2).numFmt = "@";
-
-        ws.addRow(["Link ảnh:", member.avatarUrl || "Không có"]);
-        ws.addRow([]);
-        ws.addRow(["LỊCH SỬ THAM GIA", "Ngày", "Điểm"]);
-
-        ws.getRow(1).font = { bold: true, color: { argb: "FF0055A5" } };
-        ws.getRow(11).font = { bold: true, color: { argb: "FF0055A5" } };
-
-        const sid = cleanId(member.studentId);
-        const myAtt = attendanceRecords.filter(
-          (a) => cleanId(a.studentId) === sid || a.memberId === member.id
-        );
-        myAtt.forEach((att) => {
-          const act = activities.find((a) => a.id === att.activityId);
-          ws.addRow([
-            act?.name || act?.title || "Hoạt động tình nguyện",
-            act?.date || att.timestamp?.toDate?.()?.toLocaleDateString("vi-VN") || "N/A",
-            act?.points || 10,
-          ]);
-        });
-      });
-
-      const buffer = await workbook.xlsx.writeBuffer();
-      const blob = new Blob([buffer], {
-        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=utf-8",
-      });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `DanhSach_${group === "TNV" ? "TNV" : `To_${group}`}.xlsx`;
-      a.click();
-      setThongBao(`Đã xuất báo cáo ${groupLabel} thành công!`);
-    } catch (e: any) {
-      alert("Lỗi xuất file Tổ: " + e.message);
-    } finally {
-      setExporting(false);
-    }
+  // Xuất lịch sử điểm danh theo tổ
+  const exportGroupHistory = async (group: string) => {
+    setExporting(true); setProblem(""); setThongBao(null);
+    try { const {downloadAttendanceReport}=await import("@/lib/attendance-export"); await downloadAttendanceReport({group}); }
+    catch (cause) { setProblem(cause instanceof Error ? cause.message : "Chưa xuất được báo cáo."); }
+    finally{setExporting(false);}
   };
 
-  // 7. Xuất theo Ban
-  const handleExportByDepartment = async (dept: string) => {
-    setExporting(true);
-    await new Promise((resolve) => setTimeout(resolve, 150));
-
-    try {
-      const deptMembers = members.filter((m) => {
-        if (dept === "none") return !m.department;
-        return m.department === dept;
-      });
-
-      const deptLabel = dept === "none" ? "Chua_Phan_Ban" : dept.replace(/\s+/g, "_");
-      const deptTitle = dept === "none" ? "Chưa Phân Ban" : `Ban ${dept}`;
-
-      if (deptMembers.length === 0) {
-        alert(`Không có thành viên nào thuộc ${deptTitle}`);
-        setExporting(false);
-        return;
-      }
-
-      executeCustomExport(deptMembers, `DanhSach_${deptLabel}`);
-    } catch (e: any) {
-      alert("Lỗi xuất file Ban: " + e.message);
-      setExporting(false);
-    }
+  const handleExportByDepartment = (dept: string) => {
+    const rows = members.filter(member => dept === "none" ? !member.department : member.department === dept);
+    const label = dept === "none" ? "Chua_Phan_Ban" : dept.replace(/\s+/g, "_");
+    return executeCustomExport(rows, `DanhSach_${label}`);
   };
 
-  return (
-    <div className="space-y-6 select-none font-sans max-w-6xl mx-auto pb-16 px-4 pt-6">
-      {/* Toast thông báo */}
-      {thongBao && (
-        <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center justify-between shadow-xs">
-          <span>{thongBao}</span>
-          <button
-            type="button"
-            onClick={() => setThongBao(null)}
-            className="cursor-pointer"
-          >
-            Đóng
-          </button>
-        </div>
-      )}
-
-      {/* HEADER */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900 tracking-tight">
-            Trung Tâm Công Cụ Dữ Liệu và Xuất Báo Cáo
-          </h2>
-          <p className="text-xs text-slate-500 mt-1 font-medium">
-            Phân hệ phụ trách nhập dữ liệu hàng loạt kèm mảng chuyên môn, tải file mẫu và xuất báo cáo..
-          </p>
-        </div>
-
-        <Link
-          href="/admin/thanh-vien"
-          className="px-4 py-2 rounded-xl text-xs font-bold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition shadow-xs self-start sm:self-auto"
-        >
-          Quay lại danh sách
-        </Link>
+  const applyImport = async () => {
+    if (!importPreview || importing) return;
+    setImporting(true); setProblem("");
+    try {
+      const response = await fetch("/api/admin/member-import", {method:"POST", headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({ rows:importPreview.rows, revision:importPreview.revision, apply:true })});
+      const result = await response.json();
+      if (!response.ok) throw Error(result.error || "Chưa nhập được dữ liệu.");
+      setThongBao("Đã nhập " + result.count + " hồ sơ.");
+      setImportPreview(null);
+      setRequested(false); setMembers([]); setRosterReady(false); setRosterError(false);
+    } catch (cause) { setProblem(cause instanceof Error ? cause.message : "Chưa nhập được dữ liệu."); }
+    finally { setImporting(false); }
+  };
+  return <section className={styles.page}>
+    <header className={styles.header}><h1>Nhập, xuất thành viên</h1><Link href="/admin/thanh-vien" className={styles.secondary}>Danh sách thành viên</Link></header>
+    <nav className={styles.tabs} aria-label="Công cụ thành viên">
+      {(["Nhập Excel", "Xuất báo cáo", "Đối soát"] as const).map(name => <button key={name} aria-pressed={tab === name} disabled={importing || exporting}
+        onClick={() => { setTab(name); setProblem(""); setThongBao(null); if (name === "Xuất báo cáo") setRequested(true); }}>{name}</button>)}
+    </nav>
+    {problem && <p role="alert" className={styles.error}>{problem}</p>}
+    {thongBao && <p role="status" className={styles.notice}>{thongBao}</p>}
+    {tab === "Nhập Excel" && <div className={styles.toolsPanel}>
+      <h2 className={styles.subheading}>Nhập hồ sơ từ Excel</h2><p className={styles.muted}>Tải file mẫu, điền thông tin rồi chọn tệp để xem trước các thay đổi theo MSSV.</p>
+      <div className={styles.actions}><button className={styles.primary} disabled={importing} onClick={() => fileInputRef.current?.click()}>{importing ? "Đang xử lý…" : "Chọn file Excel"}</button>
+        <button className={styles.secondary} disabled={importing} onClick={downloadTemplate}><WorkspaceIcon name="export" />Tải file mẫu</button>
+        <input type="file" ref={fileInputRef} hidden accept=".xlsx,.xls" aria-label="Chọn file Excel" onChange={handleFileUpload} /></div>
+      {importPreview && <section className={styles.preview}><h2 className={styles.subheading}>Xem trước {importPreview.plan.length} hồ sơ</h2>
+        <p className={styles.muted}>Các ô trống giữ nguyên thông tin đang có.</p>
+        <div className={styles.changes}>{importPreview.plan.map(p => <details key={p.id}><summary>{p.mssv} · {p.existing ? "Cập nhật" : "Thêm mới"} · {p.changes.length} thay đổi</summary>
+          {p.changes.map(c => <p key={c.field}>{c.field} · {String(c.from) || "(trống)"} → {String(c.to)}</p>)}</details>)}</div>
+        <div className={styles.actions}><button className={styles.primary} disabled={importing} onClick={applyImport}>Xác nhận nhập</button>
+          <button className={styles.secondary} disabled={importing} onClick={() => setImportPreview(null)}>Hủy</button></div>
+      </section>}
+    </div>}
+    {tab === "Xuất báo cáo" && <div className={styles.toolsPanel}>
+      {rosterError ? <p role="alert" className={styles.error}>Chưa tải được thành viên. <button className={styles.textButton} onClick={() => {setRosterError(false); setAttempt(n => n + 1);}}>Thử lại</button></p>
+        : !rosterReady && <p role="status" className={styles.empty}>Đang tải danh sách thành viên…</p>}
+      <fieldset className={styles.columnPicker} disabled={exporting}><legend>Cột trong danh sách</legend>
+        {Object.entries(exportOptions).map(([key,value]) => <label key={key}><input type="checkbox" checked={value} onChange={e => setExportOptions({...exportOptions, [key]:e.target.checked})} />{EXPORT_LABELS[key]}</label>)}</fieldset>
+      {!hasExportColumns && <p role="status" className={styles.empty}>Chọn ít nhất một cột để xuất.</p>}
+      <button className={styles.primary} disabled={rosterDisabled} onClick={() => executeCustomExport(members, "DanhSach_ToanBo")}><WorkspaceIcon name="export" />{exporting ? "Đang tạo file…" : "Xuất toàn bộ (" + members.length + ")"}</button>
+      <div className={styles.reportScope}><h2 className={styles.subheading}>Xuất theo phạm vi</h2>
+        <div className={styles.reportRow}><label>Tổ<select aria-label="Tổ cần xuất" value={exportGroupSelect} onChange={e => setExportGroupSelect(e.target.value)}>{["1","2","3","4","5","6","TNV"].map(g => <option key={g} value={g}>{g === "TNV" ? g : "Tổ " + g}</option>)}</select></label>
+          <div className={styles.actions}><button className={styles.secondary} disabled={rosterDisabled || !groupMembers.length} onClick={() => executeCustomExport(groupMembers, "DanhSach_To_" + exportGroupSelect)}>Danh sách tổ ({groupMembers.length})</button>
+          <button className={styles.textButton} disabled={exporting} onClick={() => exportGroupHistory(exportGroupSelect)}>Lịch sử điểm danh</button></div></div>
+        <div className={styles.reportRow}><label>Ban<select aria-label="Ban cần xuất" value={exportDepartmentSelect} onChange={e => setExportDepartmentSelect(e.target.value)}><option>Sự kiện</option><option>Truyền thông</option><option value="none">Chưa phân ban</option></select></label>
+          <button className={styles.secondary} disabled={rosterDisabled} onClick={() => handleExportByDepartment(exportDepartmentSelect)}>Xuất danh sách ban</button></div>
+        <div className={styles.reportRow}><label>Danh sách MSSV<textarea value={exportStudentIds} rows={2} onChange={e => setExportStudentIds(e.target.value)} placeholder="Mỗi mã cách nhau bằng dấu phẩy hoặc xuống dòng" /></label>
+          <button className={styles.secondary} disabled={rosterDisabled || !exportStudentIds.trim()} onClick={() => {
+            const ids = new Set(exportStudentIds.split(/[\s,;]+/).map(cleanId).filter(Boolean));
+            void executeCustomExport(members.filter(m => ids.has(cleanId(m.studentId))), "DanhSach_MSSV_ChonLoc");
+          }}>Xuất theo MSSV</button></div>
       </div>
-
-      {/* KHỐI 1: TẢI FILE MẪU & NHẬP EXCEL */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs flex flex-col justify-between space-y-4">
-          <div>
-            <h4 className="text-sm font-bold text-slate-900">1. Tải Tệp Mẫu Nhập Liệu</h4>
-            <p className="text-xs text-slate-500 mt-1">
-              File Excel chuẩn gồm: Họ tên, MSSV, Ngành/Lớp, Ban, Mảng chuyên môn, Tổ, Ngày sinh, Link ảnh Drive..
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={downloadTemplate}
-            className="w-full py-2.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-[#0284c7] text-xs font-bold transition border border-sky-200 cursor-pointer"
-          >
-            Tải File Mẫu Excel
-          </button>
-        </div>
-
-        <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs flex flex-col justify-between space-y-4">
-          <div>
-            <h4 className="text-sm font-bold text-slate-900">2. Nhập Dữ Liệu Hàng Loạt</h4>
-            <p className="text-xs text-slate-500 mt-1">
-              MSSV là mã định danh cố định. Cập nhật mọi thông tin cá nhân mới và giữ nguyên số buổi điểm danh.
-            </p>
-          </div>
-          <label className="w-full py-2.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold transition border border-indigo-200 cursor-pointer text-center block">
-            {importing ? "Đang đồng bộ dữ liệu..." : "Chọn Tệp Excel Để Nhập"}
-            <input
-              type="file"
-              accept=".xlsx, .xls"
-              ref={fileInputRef}
-              onChange={handleFileUpload}
-              className="hidden"
-            />
-          </label>
-        </div>
-      </div>
-
-      {/* KHỐI 2: TÙY CHỌN XUẤT EXCEL */}
-      <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-xs space-y-6">
-        <h3 className="text-base font-bold text-slate-900 border-b border-slate-100 pb-3">
-          Tùy Chọn Xuất Báo Cáo Excel Phân Hệ
-        </h3>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
-          {/* Cột 1: Tùy chọn trường thông tin xuất */}
-          <div className="space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
-            <span className="font-bold text-slate-800 uppercase block text-[11px]">
-              Tùy chọn cột thông tin xuất (Hỗ trợ chèn mã QR).
-            </span>
-            <div className="grid grid-cols-2 gap-2">
-              {Object.entries(exportOptions).map(([key, value]) => (
-                <label
-                  key={key}
-                  className="flex items-center justify-between p-2 bg-white rounded-lg border border-slate-200 cursor-pointer"
-                >
-                  <span className="font-semibold text-slate-700">
-                    {EXPORT_LABELS[key] || key}
-                  </span>
-                  <input
-                    type="checkbox"
-                    checked={value}
-                    onChange={(e) =>
-                      setExportOptions({ ...exportOptions, [key]: e.target.checked })
-                    }
-                    className="w-3.5 h-3.5 accent-[#0284c7]"
-                  />
-                </label>
-              ))}
-            </div>
-            <button
-              type="button"
-              disabled={exporting}
-              onClick={() => executeCustomExport(members, "DanhSach_ToanBo")}
-              className="w-full py-2.5 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] text-white font-bold transition uppercase cursor-pointer disabled:opacity-50"
-            >
-              {exporting ? "Đang xử lý tạo file..." : `Xuất Toàn Bộ (${members.length} thành viên)`}
-            </button>
-          </div>
-
-          {/* Cột 2: Xuất theo Tổ, Ban, MSSV */}
-          <div className="space-y-4">
-            {/* Xuất Tổ */}
-            <div className="bg-amber-50/60 p-4 rounded-2xl border border-amber-200 space-y-2">
-              <span className="font-bold text-amber-900 uppercase block text-[11px]">
-                Xuất theo Tổ (Kèm mảng & sheet lịch sử hoạt động).
-              </span>
-              <div className="flex gap-2">
-                <select
-                  value={exportGroupSelect}
-                  onChange={(e) => setExportGroupSelect(e.target.value)}
-                  className="bg-white border border-amber-300 px-3 py-2 rounded-xl font-bold text-slate-800 flex-1 outline-none"
-                >
-                  {[1, 2, 3, 4, 5, 6].map((num) => (
-                    <option key={num} value={num.toString()}>
-                      Tổ {num}
-                    </option>
-                  ))}
-                  <option value="TNV">Danh Sách TNV</option>
-                </select>
-                <button
-                  type="button"
-                  disabled={exporting}
-                  onClick={() => handleExportByGroup(exportGroupSelect)}
-                  className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold rounded-xl uppercase transition cursor-pointer disabled:opacity-50"
-                >
-                  Xuất Tổ
-                </button>
-              </div>
-            </div>
-
-            {/* Xuất Ban */}
-            <div className="bg-sky-50/60 p-4 rounded-2xl border border-sky-200 space-y-2">
-              <span className="font-bold text-sky-900 uppercase block text-[11px]">
-                Xuất theo Ban trực thuộc.
-              </span>
-              <div className="flex gap-2">
-                <select
-                  value={exportDepartmentSelect}
-                  onChange={(e) => setExportDepartmentSelect(e.target.value)}
-                  className="bg-white border border-sky-300 px-3 py-2 rounded-xl font-bold text-slate-800 flex-1 outline-none"
-                >
-                  <option value="Sự kiện">Ban Sự kiện</option>
-                  <option value="Truyền thông">Ban Truyền thông</option>
-                  <option value="none">Chưa phân ban</option>
-                </select>
-                <button
-                  type="button"
-                  disabled={exporting}
-                  onClick={() => handleExportByDepartment(exportDepartmentSelect)}
-                  className="px-4 py-2 bg-[#0284c7] hover:bg-[#0369a1] text-white font-bold rounded-xl uppercase transition cursor-pointer disabled:opacity-50"
-                >
-                  Xuất Ban
-                </button>
-              </div>
-            </div>
-
-            {/* Xuất danh sách MSSV */}
-            <div className="bg-purple-50/60 p-4 rounded-2xl border border-purple-200 space-y-2">
-              <span className="font-bold text-purple-900 uppercase block text-[11px]">
-                Xuất lọc theo danh sách MSSV dán ngoài.
-              </span>
-              <textarea
-                value={exportStudentIds}
-                onChange={(e) => setExportStudentIds(e.target.value)}
-                placeholder="Dán danh sách MSSV (cách nhau bởi dấu phẩy, khoảng cách hoặc dòng mới)..."
-                className="w-full bg-white border border-purple-200 p-2 rounded-lg text-xs outline-none h-14 font-mono resize-none"
-              />
-              <button
-                type="button"
-                disabled={exporting}
-                onClick={() => {
-                  const ids = exportStudentIds
-                    .split(/[\n, ]+/)
-                    .map((id) => cleanId(id))
-                    .filter((id) => id.length > 0);
-
-                  const matchMems = members.filter((m) =>
-                    ids.includes(cleanId(m.studentId))
-                  );
-                  if (matchMems.length === 0) {
-                    alert("Không tìm thấy mã sinh viên nào khớp!");
-                    return;
-                  }
-                  executeCustomExport(matchMems, "DanhSach_MSSV_ChonLoc");
-                }}
-                className="w-full py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl uppercase transition cursor-pointer disabled:opacity-50"
-              >
-                Xuất Danh Sách MSSV Đã Nhập
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* KHỐI 3: QUẢN TRỊ DỌN DẸP DỮ LIỆU (DANGER ZONE) */}
-      <div className="bg-rose-50/40 border border-rose-200 rounded-3xl p-6 shadow-xs space-y-4">
-        <div>
-          <h3 className="text-sm font-bold text-rose-800 uppercase tracking-tight flex items-center gap-2">
-            <span>⚠️</span> Vùng Quản Trị & Đặt Lại Dữ Liệu
-          </h3>
-          <p className="text-xs text-rose-600 mt-1">
-            Các thao tác tại khu vực này có tính chất xóa vĩnh viễn trên cơ sở dữ liệu Firestore. Hãy cân nhắc cẩn thận trước khi ấn.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-          <div className="bg-white border border-rose-200 p-4 rounded-2xl flex flex-col justify-between space-y-3">
-            <div>
-              <h4 className="text-xs font-bold text-slate-800">
-                1. Reset Tất Cả Buổi Điểm Danh
-              </h4>
-              <p className="text-[11px] text-slate-500 mt-0.5">
-                Xóa sạch collection điểm danh và đặt lại số buổi điểm danh của toàn bộ thành viên về 0 (giữ nguyên danh sách người).
-              </p>
-            </div>
-            <button
-              type="button"
-              disabled={isDeleting}
-              onClick={handleResetAttendance}
-              className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition uppercase cursor-pointer disabled:opacity-50 shadow-xs"
-            >
-              {isDeleting ? "Đang xử lý..." : "Reset Toàn Bộ Điểm Danh Về 0"}
-            </button>
-          </div>
-
-          <div className="bg-white border border-rose-200 p-4 rounded-2xl flex flex-col justify-between space-y-3">
-            <div>
-              <h4 className="text-xs font-bold text-rose-700">
-                2. Xóa Toàn Bộ Thành Viên
-              </h4>
-              <p className="text-[11px] text-slate-500 mt-0.5">
-                Xóa sạch toàn bộ danh sách thành viên trong hệ thống và dọn dẹp các lịch sử điểm danh liên quan.
-              </p>
-            </div>
-            <button
-              type="button"
-              disabled={isDeleting}
-              onClick={handleDeleteAllMembers}
-              className="w-full py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition uppercase cursor-pointer disabled:opacity-50 shadow-xs"
-            >
-              {isDeleting ? "Đang xử lý..." : "Xóa Tất Cả Thành Viên"}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+    </div>}
+    {tab === "Đối soát" && <div className={styles.toolsPanel}><h2 className={styles.subheading}>Lưu trữ và khôi phục thành viên</h2>
+      <p className={styles.muted}>Xem lý do, duyệt đề nghị lưu trữ hoặc khôi phục hồ sơ đã lưu.</p>
+      <div><Link className={styles.secondary} href="/admin/duyet-diem-danh?tab=removal">Mở đề nghị lưu trữ</Link></div></div>}
+  </section>;
 }

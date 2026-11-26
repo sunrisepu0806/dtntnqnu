@@ -1,0 +1,66 @@
+.inbox { min-width: 0; color: #183759; }
+.toolbar, .caption, .selection, .actions, .pager, .personHeading { display: flex; align-items: center; gap: 6px 9px; }
+.toolbar, .caption, .selection { justify-content: space-between; }
+.statuses { display: inline-flex; gap: 2px; padding: 2px; border-radius: 9px; background: #eff3f8; }
+.inbox button { cursor: pointer; }
+.inbox button:disabled { cursor: default; opacity: .55; }
+.statuses button, .refresh, .pager button, .actions button { min-height: 36px; padding: 5px 10px; border-radius: 7px; font-size: 13px; font-weight: 600; }
+.statuses button { color: #536883; white-space: nowrap; }
+.statuses button[aria-pressed=true] { color: #154f9c; background: #fff; box-shadow: 0 1px 4px #254d801d; }
+.refresh { display: grid; place-items: center; width: 38px; color: #235b9a; background: #eff3f8; }
+.refresh svg, .search svg { width: 17px; height: 17px; flex: none; }
+.filters { display: flex; align-items: stretch; flex-wrap: wrap; gap: 6px; margin: 8px 0 12px; }
+.inbox select { min-width: 0; min-height: 36px; padding: 5px 6px; border: 0; border-radius: 7px; background: #f0f3f8; font-size: 13px; color: #25486e; }
+.search { display: flex; align-items: center; gap: 6px; flex: 1 1 125px; min-width: 0; max-width: 25rem; padding-inline: 9px; border-radius: 7px; background: #f0f3f8; color: #576e8a; }
+.search input { width: 100%; min-width: 0; min-height: 36px; border: 0; background: transparent; font-size: 13px; color: #183759; }
+.search:focus-within { outline: 2px solid #5996e2; }
+.search input:focus-visible { outline: none; }
+.caption, .sent, .quantity, .identity small, .person small { color: #526982; font-size: 12px; }
+.caption { gap: 4px; flex-wrap: wrap; }
+.caption strong { color: #274769; font-weight: 600; }
+.caption span, .quantity, .points { font-variant-numeric: tabular-nums; }
+.selection { flex-wrap: wrap; margin-top: 2px; }
+.selection label { display: inline-flex; align-items: center; gap: 7px; min-height: 40px; font-size: 13px; cursor: pointer; }
+.inbox input[type=checkbox] { width: 17px; height: 17px; flex: none; accent-color: #2160ac; }
+.actions { flex-wrap: wrap; }
+.approve { background: #e3f2ea; color: #17623f; }
+.reject { background: #f9eded; color: #96413c; }
+.neutral, .pager button { color: #205997; background: #eef3fa; }
+.notice, .error, .empty { padding: 7px 0; font-size: 13px; white-space: pre-line; overflow-wrap: anywhere; }
+.notice { color: #1d684c; }
+.error { color: #9b3631; }
+.empty { color: #586c82; }
+.empty button { color: #1e569b; min-height: 40px; text-decoration: underline; }
+.list { padding: 0; margin-top: 4px; border-top: 1px solid #e8edf4; }
+.batch { border-bottom: 1px solid #e8edf4; }
+.batch summary { display: grid; grid-template-columns: 12px minmax(0,1fr) auto; align-items: center; gap: 9px; min-height: 50px; padding: 9px 4px; cursor: pointer; list-style: none; }
+.batch summary::-webkit-details-marker { display: none; }
+.batch summary:hover { background: #f6f9fc; }
+.chevron { font-size: 20px; color: #637d9d; }
+.batch[open] .chevron { transform: rotate(90deg); }
+.identity, .personHeading > span { display: grid; gap: 1px; min-width: 0; overflow-wrap: anywhere; }
+.title, .person strong { font-size: 14px; font-weight: 650; color: #214e88; }
+.quantity { color: #34567c; white-space: nowrap; }
+.members { padding: 1px 8px 7px 25px; }
+.sent { margin: 3px 0 6px; }
+.person { padding: 7px 0; }
+.person + .person { border-top: 1px solid #edf1f6; }
+.personHeading { align-items: baseline; }
+.points { margin-left: auto; white-space: nowrap; font-size: 12px; font-weight: 600; }
+.person p { overflow-wrap: anywhere; white-space: pre-line; margin: 5px 0; font-size: 13px; }
+.person .actions { margin-top: 5px; }
+.pager { flex-wrap: wrap; margin-top: 9px; color: #526982; font-size: 12px; }
+.pager span { margin-right: auto; }
+.dialog { position: fixed; inset: 0; width: min(420px,calc(100% - 24px)); max-height: calc(100dvh - 24px); overflow: auto; margin: auto; padding: 17px; border: 0; border-radius: 12px; background: white; color: #183759; box-shadow: 0 14px 40px #16365d3b; }
+.dialog::backdrop { background: #19355565; }
+.dialog h2 { margin: 0 0 10px; font-size: 17px; font-weight: 650; }
+.dialog label { display: grid; gap: 6px; font-size: 13px; }
+.dialog textarea { width: 100%; min-width: 0; padding: 8px; border: 1px solid #c7d5e5; border-radius: 8px; }
+.dialog .actions { justify-content: end; margin-top: 10px; }
+@media (max-width: 760px) {
+  .statuses button, .refresh, .actions button, .inbox select, .search input, .selection label, .pager button { min-height: 44px; }
+  .refresh { width: 44px; }
+  .statuses button { padding-inline: 8px; font-size: 12px; }
+  .search input, .dialog textarea { font-size: 16px; }
+  .members { padding-inline: 5px; }
+}

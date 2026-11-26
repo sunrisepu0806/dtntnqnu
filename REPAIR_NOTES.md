@@ -106,3 +106,12 @@ firebase emulators:exec --only firestore --project demo-webdtntn --config fireba
 - Xác minh: TypeScript và 48 kiểm thử đạt; Firebase emulator integration đạt (đợt gửi, pending bị loại khỏi báo cáo, duyệt, chuyển đơn vị không mất số buổi, log idempotent, biên tháng VN). Không ghi đề nghị thử vào production.
 - Giao diện thật: trang quản lý tải được và báo cáo tháng 2026-10 hiển thị 1 người / 3 lượt / 3 buổi. File C:\Users\Phu\Downloads\Bao-cao-2026-10.xlsx đã đọc lại: Tong hop 4 dòng, Chi tiet 4 dòng gồm header, tổng chi tiết 3 buổi khớp UI. Ảnh management-hub.png trong visualizations của chat.
 - Lần kiểm tra UI cuối bị giới hạn bởi cài đặt Work tắt browser use; không thay đổi cài đặt này. Dev server đã chạy nền, logs ở %LOCALAPPDATA%\Temp\webdtntn-management.*.log.
+
+## Hai luồng và nhiều buổi — 23/10/2026
+- Hoạt động có flow group/department. Buổi có ngày và Cả ngày/Sáng/Chiều/Tối, tối đa 100 buổi; không cho buổi cả ngày chồng ca khác.
+- Bản ghi tổ lưu attendance, ban/mảng lưu department_tasks. Khóa chống trùng gồm hoạt động/buổi/thành viên; duyệt lại không cộng lại. Trưởng ban được gửi chéo ban, không được gửi luồng tổ; chỉ admin duyệt.
+- API activities phục vụ lựa chọn hoạt động và thêm buổi có kiểm tra phiên và quyền trực tiếp. QR chỉ luồng tổ và phải chọn buổi.
+- Trang duyệt chia tab tổ/ban, nhóm không gộp khác buổi. Báo cáo tháng xuất đúng 2 sheet Điểm danh tổ / Điểm danh ban mảng, tổng riêng từng sheet, MSSV dạng text. Tháng là tháng ghi nhận; ngày tham gia có cột riêng.
+- Không tự phân loại lại dữ liệu lịch sử thiếu thông tin: attendance cũ giữ trong sổ tổ, department_tasks cũ giữ sổ ban; buổi gốc giữ dedup cũ. Cần đối soát thủ công nếu trước đây trưởng ban gửi vào sổ hoạt động chung. soBuoiDiemDanh vẫn là trường tổng tương thích dữ liệu cũ; giao diện hai luồng và báo cáo lấy sổ riêng.
+- Kiểm tra: TypeScript thành công; 54 unit/regression tests; 2 real Firestore emulator integration tests; Excel write/read roundtrip đúng 2 sheet và số buổi riêng; Vercel preview build READY.
+- Không kiểm tra trực quan do browser use bị tắt trong Work settings.

@@ -6,13 +6,13 @@ function fixture(role = 'Quản trị viên') {
     'admin_accounts/admin': { role, authVersion: 'v1' },
     'web_sessions/session': { expiresAt: { toMillis: () => Date.now() + 60000 } },
     'users/member': { mssv: 'student', to_id: 'to_1', ban_id: ['bansukien'], soBuoiDiemDanh: 0 },
-    'activities/activity': { name: 'Activity', isActive: true },
+    'activities/activity': { name: 'Activity', isActive: true, ...(role.startsWith('Trưởng ban') ? {flow:'department',accessDepartment:'su-kien'} : {}) },
   });
   const session = { user: { role, name: 'Admin', mssv: 'admin', department: 'su-kien' }, authVersion: 'v1',
     accountRef: db.collection('admin_accounts').doc('admin'), sessionRef: db.collection('web_sessions').doc('session') };
   const service = load('lib/attendance-service.ts', { 'server-only': {},
     'firebase-admin/firestore': { FieldValue }, '@/lib/firebase-admin': { adminDb: () => db },
-    '@/lib/server-session': { readSession: async () => session }, '@/lib/member-scope': load('lib/member-scope.ts') });
+    '@/lib/server-session': { readSessionClaims: async () => null, readSession: async () => session }, '@/lib/member-scope': load('lib/member-scope.ts') });
   return { ...service, records, session };
 }
 const input = { activityId: 'activity', memberId: 'member' };
@@ -34,6 +34,13 @@ test('closed activities reject scanners but allow an admin manual correction', a
   assert.equal(f.records.get('users/member').soBuoiDiemDanh, 0);
   await f.recordAttendance(input, false, true);
   assert.equal(f.records.get('users/member').soBuoiDiemDanh, 1);
+});
+test('an archived activity rejects a late admin correction without changing the ledger or totals', async () => {
+  const f = fixture();
+  Object.assign(f.records.get('activities/activity'), { isActive: false, archived: true });
+  await assert.rejects(f.recordAttendance(input, false, true), e => e.status === 409);
+  assert.equal(f.records.get('users/member').soBuoiDiemDanh, 0);
+  assert.equal([...f.records.keys()].some(key => key.startsWith('attendance/')), false);
 });
 test('non-admins cannot use manual add or delete', async () => {
   for (const role of ['Quét mã', 'Tổ trưởng', 'Trưởng ban Sự kiện']) {
@@ -114,7 +121,7 @@ test('both department leaders submit across departments but cannot count before 
     f.session.user.role='Quản trị viên';f.records.get('admin_accounts/admin').role='Quản trị viên';
     await f.reviewAttendanceRequest({id,action:'approve'});await f.reviewAttendanceRequest({id,action:'approve'});
     assert.equal(f.records.get('users/member').soBuoiDiemDanh,1);
-    assert.equal([...f.records.keys()].filter(k=>k.startsWith('attendance/')).length,1);
+    assert.equal([...f.records.keys()].filter(k=>k.startsWith('department_tasks/')).length,1);
   }
 });
 test('roster cannot bypass closed activity or live role changes', async () => {
@@ -152,4 +159,53 @@ test('revoked admin cannot approve a pending submission',async()=>{
  f.session.user.role='Quản trị viên';f.records.get('admin_accounts/admin').role='Quản trị viên';f.records.delete('web_sessions/session');
  await assert.rejects(f.reviewAttendanceRequest({id,action:'approve'}),e=>e.status===401);
  assert.equal(f.records.get('users/member').soBuoiDiemDanh,0);
+});
+
+
+test('sessions count once per member per session; next day counts independently',async()=>{
+ const f=fixture();f.records.get('activities/activity').sessions=[{id:'day1',date:'2026-10-23',name:'Sáng'},{id:'day2',date:'2026-10-24',name:'Sáng'}];
+ await assert.rejects(f.recordAttendance(input,false),e=>e.status===400);
+ const first={...input,sessionId:'day1'};
+ const results=await Promise.all([f.recordAttendance(first,false),f.recordAttendance(first,false)]);
+ assert.equal(results.filter(r=>r.alreadyCheckedIn).length,1);
+ await f.recordAttendance({...input,sessionId:'day2'},false);
+ assert.equal(f.records.get('users/member').groupSessions,2);
+ assert.equal(f.records.get('users/member').departmentSessions,undefined);
+ assert.equal([...f.records.keys()].filter(k=>k.startsWith('attendance/')).length,2);
+});
+test('department sessions stay out of group ledger and retain event department on approval',async()=>{
+ const f=fixture('Trưởng ban Truyền thông');f.records.get('users/member').ban_id=['bantruyenthong'];
+ f.records.get('activities/activity').sessions=[{id:'one',date:'2026-10-23',name:'Sáng'},{id:'two',date:'2026-10-24',name:'Sáng'}];
+ for(const sessionId of ['one','two'])await f.recordAttendance({...input,sessionId,flow:'department'},false,false,true);
+ assert.equal(f.records.get('users/member').soBuoiDiemDanh,0);
+ const requests=[...f.records].filter(([k])=>k.startsWith('attendance_requests/'));
+ f.session.user.role='Quản trị viên';f.records.get('admin_accounts/admin').role='Quản trị viên';
+ for(const [key] of requests)await Promise.all([1,2].map(()=>f.reviewAttendanceRequest({id:key.split('/')[1],action:'approve'})));
+ assert.equal([...f.records.keys()].filter(k=>k.startsWith('attendance/')).length,0);
+ const ledger=[...f.records].filter(([k])=>k.startsWith('department_tasks/'));
+ assert.equal(ledger.length,2);assert.ok(ledger.every(([,v])=>v.accessDepartment==='su-kien'&&v.sessionDate));
+ assert.equal(f.records.get('users/member').departmentSessions,2);assert.equal(f.records.get('users/member').groupSessions,undefined);
+});
+test('flow restrictions reject forged roster, scanner department and department leader group',async()=>{
+ for(const role of ['Tổ trưởng','Quét mã']){const f=fixture(role);f.records.get('activities/activity').flow='department';await assert.rejects(f.recordAttendance(input,false,false,role==='Tổ trưởng'),e=>e.status===403);}
+ const f=fixture('Trưởng ban Sự kiện');f.records.get('activities/activity').flow='group';await assert.rejects(f.recordAttendance(input,false,false,true),e=>e.status===403);
+ const admin=fixture();await assert.rejects(admin.recordAttendance({...input,flow:'department'},false),e=>e.status===403);
+});
+
+test('approval preserves submission unit after member transfer',async()=>{
+ const f=fixture('Tổ trưởng');f.session.user.to_id='Tổ 1';f.records.get('admin_accounts/admin').to_id='Tổ 1';
+ await f.recordAttendance(input,false,false,true,true);
+ const id=[...f.records.keys()].find(k=>k.startsWith('attendance_requests/')).split('/')[1];
+ f.records.get('users/member').to_id='to_2';f.records.get('users/member').ban_id=['bantruyenthong'];
+ f.session.user.role='Quản trị viên';f.records.get('admin_accounts/admin').role='Quản trị viên';
+ await f.reviewAttendanceRequest({id,action:'approve'});
+ const record=[...f.records].find(([k])=>k.startsWith('attendance/'))[1];
+ assert.equal(record.accessGroup,'1');assert.equal(record.accessDepartment,'su-kien');
+});
+
+test('archived attendance cannot be submitted again or removed twice',async()=>{
+ const f=fixture();await f.recordAttendance(input,false,true);
+ const [key,data]=[...f.records].find(([k])=>k.startsWith('attendance/'));data.archived=true;
+ await assert.rejects(f.recordAttendance(input,false,true),e=>e.status===409);
+ await assert.rejects(f.removeAttendance({attendanceId:key.split('/')[1]}),e=>e.status===409);
 });

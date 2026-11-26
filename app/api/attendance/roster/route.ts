@@ -4,6 +4,7 @@ import { readSession } from "@/lib/server-session";
 import { adminDb } from "@/lib/firebase-admin";
 import { AttendanceError, recordAttendance } from "@/lib/attendance-service";
 import { parseStudentIds } from "@/lib/student-roster";
+import { validSession } from "@/lib/activity-model";
 import { groupNumber } from "@/lib/permissions";
 
 export async function POST(request: Request) {
@@ -40,6 +41,11 @@ export async function POST(request: Request) {
     const name = typeof body.name === "string" ? body.name.trim() : "";
     const date = typeof body.date === "string" ? body.date : "";
     if (!name || name.length > 200 || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(Date.parse(date)) || new Date(date).toISOString().slice(0, 10) !== date) throw new AttendanceError("Nhập tên và ngày hoạt động hợp lệ.");
+    const flow = body.flow === "department" ? "department" : "group";
+    if (role === "Tổ trưởng" && flow !== "group" || role.startsWith("Trưởng ban") && flow !== "department") throw new AttendanceError("Không có quyền tạo hoạt động trong luồng này.",403);
+    const targetDepartment=flow==="department" ? body.department : "";
+    if(flow==="department" && !["su-kien","truyen-thong"].includes(targetDepartment))throw new AttendanceError("Chọn ban/mảng của hoạt động.");
+    const firstSession=validSession(date,body.sessionName||"Cả ngày");
     const ref = db.collection("activities").doc(body.id);
     await db.runTransaction(async tx => {
       const [actor, live, existing] = await Promise.all([tx.get(session.accountRef), tx.get(session.sessionRef), tx.get(ref)]);
@@ -52,9 +58,9 @@ export async function POST(request: Request) {
         return;
       }
       tx.create(ref, { name, date, points: 1, isActive: true, password: crypto.randomUUID().slice(0, 8),
-        createdBy: session.accountRef.id, accessGroup: group || "", accessDepartment: "", createdAt: FieldValue.serverTimestamp() });
+        flow, sessions:[firstSession], createdBy: session.accountRef.id, accessGroup: group || "", accessDepartment: targetDepartment, createdAt: FieldValue.serverTimestamp() });
     });
-    return NextResponse.json({ activityId: ref.id });
+    return NextResponse.json({ activityId: ref.id, sessionId:firstSession.id });
   } catch (error) {
     return NextResponse.json({ error: error instanceof AttendanceError || error instanceof Error && error.message.startsWith("Hãy dán") ? error.message : "Không thể xử lý danh sách. Kiểm tra dữ liệu và thử lại." }, { status: error instanceof AttendanceError ? error.status : 400 });
   }

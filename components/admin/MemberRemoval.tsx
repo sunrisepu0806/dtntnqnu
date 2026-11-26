@@ -25,7 +25,13 @@ export default function MemberRemoval(){
     const data=await response.json();if(!response.ok)throw Error(data.error);
     setRows(data.rows);setAdmin(data.admin);setError("");
   }catch(e){if(!signal?.aborted)setError(e instanceof Error?e.message:"Không tải được danh sách.");}finally{if(!signal?.aborted)setLoading(false);}}
-  useEffect(()=>{const controller=new AbortController();void load(controller.signal);return()=>controller.abort();},[]);
+  useEffect(()=>{
+    // Batch resource initialization after commit and cancel stale route setup.
+    let dispose: void | (() => void);
+    const setup = setTimeout(() => { dispose = (() => {const controller=new AbortController();void load(controller.signal);return()=>controller.abort();
+    })(); }, 0);
+    return () => { clearTimeout(setup); dispose?.(); };
+  },[]);
   async function review(row:Row,action:string){
     if(busy || (action==="reject"&&!reviewReason.trim()))return;
     setBusy(true);try{await send({action,memberId:row.id,reason:reviewReason});setDecision(null);setReviewReason("");await load();}catch(e){setError(e instanceof Error?e.message:"Không xử lý được.");}finally{setBusy(false);}

@@ -19,12 +19,14 @@ const input={action:'create',id:'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',name:'Ho�
 test('create-and-attend retries create exactly one activity, with owner scope',async()=>{
   for(const role of ['Quản trị viên','Tổ trưởng','Trưởng ban Sự kiện']){
     const f=fixture(role);
-    assert.equal((await f.post(input)).status,200);
-    assert.equal((await f.post(input)).status,200);
+    const body={...input,...(role.startsWith("Trưởng ban")?{flow:"department",department:"su-kien"}:{})};
+    assert.equal((await f.post(body)).status,200);
+    assert.equal((await f.post(body)).status,200);
     const acts=[...f.records].filter(([k])=>k.startsWith('activities/'));
     assert.equal(acts.length,1); assert.equal(acts[0][1].createdBy,'admin');
     assert.equal(acts[0][1].accessGroup,role==='Tổ trưởng'?'1':'');
-    assert.equal(acts[0][1].accessDepartment,'');
+    assert.equal(acts[0][1].accessDepartment,role.startsWith('Trưởng ban')?'su-kien':'');
+    assert.equal(acts[0][1].sessions.length,1);
   }
 });
 test('invalid date, scanner, changed scope and revoked session cannot create activities',async()=>{

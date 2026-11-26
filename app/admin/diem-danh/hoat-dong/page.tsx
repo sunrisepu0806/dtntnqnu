@@ -2,12 +2,16 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import {
-  collection, doc, updateDoc, deleteDoc, onSnapshot, serverTimestamp,
-  writeBatch, getDocs, query, where, limit,
-} from "firebase/firestore";
+import { collection, doc, onSnapshot, serverTimestamp, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import Link from "next/link";
+import { searchKey } from "@/lib/search-text";
+import { activitySessions, SESSION_NAMES, validSession } from "@/lib/activity-model";
+import { WorkspaceIcon } from "@/components/admin/workspace-navigation";
+import layout from "../attendance.module.css";
+import styles from "./activities.module.css";
+import AttendanceSections from "../AttendanceSections";
+import ActivityManagementTabs from "./ActivityManagementTabs";
 import BulkAttendance from "@/components/admin/BulkAttendance";
 
 // Trang này phải được bảo vệ bởi xác thực quản trị và Firestore Security Rules.
@@ -19,10 +23,11 @@ interface Activity {
   points: number;
   password: string;
   isActive: boolean;
+  sessionCount: number;
 }
-interface AttendanceRecord { id: string; activityId: string }
 interface ActivityForm { name: string; date: string; points: string; password: string }
 const MAX_BULK_ROWS = 200;
+const PAGE_SIZE = 10;
 
 function todayVN(): string {
   const parts = new Intl.DateTimeFormat("en-US", {
@@ -39,16 +44,18 @@ function validDate(value: string): boolean {
   const parsed = new Date(`${value}T00:00:00Z`);
   return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 }
-function validateForm(form: ActivityForm) {
+function validateForm(form: ActivityForm, requirePassword = true) {
   const name = form.name.trim();
   const password = form.password.trim();
   const points = Number(form.points);
   if (!name) throw new Error("Vui lòng nhập tên hoạt động.");
+  if (name.length > 200) throw new Error("Tên hoạt động tối đa 200 ký tự.");
   if (!validDate(form.date)) throw new Error("Ngày phải hợp lệ và có dạng YYYY-MM-DD.");
   if (!form.points.trim() || !Number.isSafeInteger(points) || points < 1) {
     throw new Error("Điểm phải là số nguyên dương.");
   }
-  if (!password) throw new Error("Vui lòng nhập mật mã ca trực.");
+  if (requirePassword && !password) throw new Error("Vui lòng nhập mật mã ca trực.");
+  if (password.length > 128) throw new Error("Mật mã tối đa 128 ký tự.");
   return { name, date: form.date, points, password };
 }
 function errorMessage(error: unknown): string {
@@ -113,7 +120,7 @@ function parseBulk(text: string): ActivityForm[] {
 
 export default function TrangQuanLyHoatDong() {
   const [activities, setActivities] = useState<Activity[]>([]);
-  const [attendanceList, setAttendanceList] = useState<AttendanceRecord[]>([]);
+  const [countAttendance, setCountAttendance] = useState<Record<string, number>>({});
   const [loadingActs, setLoadingActs] = useState(true);
   const [loadingAtt, setLoadingAtt] = useState(true);
   const [actsError, setActsError] = useState("");
@@ -121,8 +128,19 @@ export default function TrangQuanLyHoatDong() {
   const [formHoatDong, setFormHoatDong] = useState<ActivityForm>(emptyForm);
   const [dangLuu, setDangLuu] = useState(false);
   const [dangChinhSua, setDangChinhSua] = useState<Activity | null>(null);
-  const [isModalThemNhieu, setIsModalThemNhieu] = useState(false);
+  const [editor, setEditor] = useState<"single" | "bulk" | null>(null);
+  const [editorError, setEditorError] = useState("");
+  const dialog = useRef<HTMLDialogElement>(null);
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState("all");
+  const [page, setPage] = useState(1);
+  const listTitle = useRef<HTMLHeadingElement>(null);
+  const [notice, setNotice] = useState<{ text: string; activityId?: string } | null>(null);
   const [textHangLoat, setTextHangLoat] = useState("");
+  const [firstSession, setFirstSession] = useState("Cả ngày");
+  const [bulkSession, setBulkSession] = useState("Cả ngày");
   const [dangLuuHangLoat, setDangLuuHangLoat] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -133,10 +151,21 @@ export default function TrangQuanLyHoatDong() {
   const loading = loadingActs || loadingAtt;
   const loadError = actsError || attError;
   const busy = dangLuu || dangLuuHangLoat || busyId !== null;
+  const unavailable = busy || loading || Boolean(loadError);
+
+  useEffect(() => {
+    const element = dialog.current;
+    if (!element) return;
+    if (editor && !element.open) {
+      element.showModal();
+      element.querySelector<HTMLElement>("input, textarea")?.focus({ preventScroll: true });
+    }
+    if (!editor && element.open) element.close();
+  }, [editor]);
 
   useEffect(() => {
     const unsubActs = onSnapshot(collection(db, "activities"), (snap) => {
-      const list = snap.docs.map((item): Activity => {
+      const list = snap.docs.filter(item=>item.data().flow!=="department" && !item.data().archived).map((item): Activity => {
         const data = item.data();
         const points = Number(data.points ?? 10);
         return {
@@ -145,53 +174,71 @@ export default function TrangQuanLyHoatDong() {
           date: textValue(data.date),
           points: Number.isFinite(points) ? points : 10,
           password: textValue(data.password),
-          isActive: data.isActive !== false,
+          isActive: data.isActive === true,
+          sessionCount: activitySessions(data).length,
         };
       });
       list.sort((a, b) => b.date.localeCompare(a.date) || a.name.localeCompare(b.name, "vi"));
       setActivities(list); setActsError(""); setLoadingActs(false);
     }, (error) => { setActsError(`Không tải được hoạt động: ${errorMessage(error)}`); setLoadingActs(false); });
     const unsubAtt = onSnapshot(collection(db, "attendance"), (snap) => {
-      setAttendanceList(snap.docs.map((item) => ({ id: item.id, activityId: textValue(item.data().activityId) })));
+      const counts: Record<string, number> = Object.create(null);
+      snap.forEach(item => {
+        const entry = item.data();
+        if (entry.activityId && entry.archived !== true && entry.flow !== "department") {
+          counts[entry.activityId] = (counts[entry.activityId] ?? 0) + 1;
+        }
+      });
+      setCountAttendance(counts);
       setAttError(""); setLoadingAtt(false);
     }, (error) => { setAttError(`Không tải được điểm danh: ${errorMessage(error)}`); setLoadingAtt(false); });
     return () => { unsubActs(); unsubAtt(); };
   }, []);
 
-  const countAttendance = useMemo(() => {
-    const counts: Record<string, number> = Object.create(null);
-    attendanceList.forEach((att) => {
-      if (att.activityId) counts[att.activityId] = (counts[att.activityId] ?? 0) + 1;
-    });
-    return counts;
-  }, [attendanceList]);
+  const filtered = useMemo(() => {
+    const term = searchKey(query);
+    return activities.filter(act => (status === "all" || act.isActive === (status === "open"))
+      && searchKey(act.name).includes(term));
+  }, [activities, query, status]);
+  const matchingAttendance = filtered.reduce((total, activity) => total + (countAttendance[activity.id] ?? 0), 0);
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+  const pageStart = (currentPage - 1) * PAGE_SIZE;
+  const visible = filtered.slice(pageStart, pageStart + PAGE_SIZE);
+
+  function turnPage(next: number) {
+    setPage(next);
+    setExpanded(null);
+    listTitle.current?.focus({ preventScroll: true });
+    listTitle.current?.scrollIntoView({ block: "start", behavior: "instant" });
+  }
 
   const xuLyLuuHoatDong = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (mutationLock.current || loading || loadError) return;
-    mutationLock.current = true; setDangLuu(true);
+    mutationLock.current = true; setDangLuu(true); setEditorError("");
     try {
-      const payload = validateForm(formHoatDong);
+      const payload = validateForm(formHoatDong, !dangChinhSua || Boolean(dangChinhSua.password));
+      const id = dangChinhSua?.id ?? pendingCreateId.current ?? doc(collection(db, "activities")).id;
       if (dangChinhSua) {
-        await updateDoc(doc(db, "activities", dangChinhSua.id), payload);
+        const r=await fetch("/api/admin/activity",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"edit",id,...payload})});const result=await r.json();if(!r.ok)throw Error(result.error);
       } else {
-        const id = pendingCreateId.current ?? doc(collection(db, "activities")).id;
         pendingCreateId.current = id;
         const batch = writeBatch(db);
-        batch.set(doc(db, "activities", id), { ...payload, isActive: true, createdAt: serverTimestamp() });
+        batch.set(doc(db, "activities", id), { ...payload, sessions: [validSession(payload.date, firstSession)], flow:"group", isActive: true, createdAt: serverTimestamp() });
         await batch.commit();
         pendingCreateId.current = null;
       }
-      setDangChinhSua(null); setFormHoatDong(emptyForm());
-      alert("Đã lưu hoạt động thành công.");
-    } catch (error) { alert(`Lỗi khi lưu: ${errorMessage(error)}`); }
+      setNotice({ text: `Đã ${dangChinhSua ? "cập nhật" : "tạo"} hoạt động “${payload.name}”.`, activityId: id });
+      setDangChinhSua(null); setFormHoatDong(emptyForm()); setFirstSession("Cả ngày"); setEditor(null);
+    } catch (error) { setEditorError(errorMessage(error)); }
     finally { mutationLock.current = false; setDangLuu(false); }
   };
 
   const xuLyThemHangLoat = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (mutationLock.current || loading || loadError) return;
-    mutationLock.current = true; setDangLuuHangLoat(true);
+    mutationLock.current = true; setDangLuuHangLoat(true); setEditorError("");
     try {
       const rows = parseBulk(textHangLoat);
       if (pendingBulk.current?.source !== textHangLoat) {
@@ -200,13 +247,13 @@ export default function TrangQuanLyHoatDong() {
       const batch = writeBatch(db);
       const ids = pendingBulk.current.ids;
       rows.forEach((row, index) => {
-        batch.set(doc(db, "activities", ids[index]), { ...validateForm(row), isActive: true, createdAt: serverTimestamp() });
+        batch.set(doc(db, "activities", ids[index]), { ...validateForm(row), sessions: [validSession(row.date, bulkSession)], flow:"group", isActive: true, createdAt: serverTimestamp() });
       });
       await batch.commit();
       pendingBulk.current = null;
-      setTextHangLoat(""); setIsModalThemNhieu(false);
-      alert(`Đã thêm thành công ${rows.length} hoạt động.`);
-    } catch (error) { alert(`Lỗi thêm hàng loạt: ${errorMessage(error)}`); }
+      setTextHangLoat(""); setBulkSession("Cả ngày"); setEditor(null); setToolsOpen(false);
+      setNotice({ text: `Đã thêm ${rows.length} hoạt động.` });
+    } catch (error) { setEditorError(errorMessage(error)); }
     finally { mutationLock.current = false; setDangLuuHangLoat(false); }
   };
 
@@ -218,385 +265,197 @@ export default function TrangQuanLyHoatDong() {
       const XLSX = await import("xlsx");
       const data = activities.map((act, index) => ({
         STT: index + 1, "Tên Hoạt Động": act.name, "Ngày Diễn Ra": act.date,
-        "Điểm Rèn Luyện": act.points, "Mật Mã Ca Trực": act.password,
+        "Điểm Rèn Luyện": act.points,
         "Số Lượt Đã Điểm Danh": countAttendance[act.id] ?? 0,
         "Trạng Thái Cổng": act.isActive ? "Đang mở cổng" : "Đã khóa cổng",
       }));
       const sheet = XLSX.utils.json_to_sheet(data);
-      sheet["!cols"] = [{ wch: 6 }, { wch: 42 }, { wch: 16 }, { wch: 18 }, { wch: 18 }, { wch: 24 }, { wch: 20 }];
+      sheet["!cols"] = [{ wch: 6 }, { wch: 42 }, { wch: 16 }, { wch: 18 }, { wch: 24 }, { wch: 20 }];
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, sheet, "TatCaHoatDong");
       XLSX.writeFile(workbook, `Danh_sach_hoat_dong_${todayVN()}.xlsx`);
     } catch (error) { alert(`Lỗi xuất Excel: ${errorMessage(error)}`); }
     finally { setExporting(false); }
   };
-  const batDauChinhSua = (act: Activity) => {
-    if (mutationLock.current) return;
-    setDangChinhSua(act);
-    setFormHoatDong({ name: act.name, date: act.date, points: String(act.points), password: act.password });
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-  const huyChinhSua = () => {
-    if (mutationLock.current) return;
-    setDangChinhSua(null); setFormHoatDong(emptyForm());
+  const openForm = (act?: Activity) => {
+    if (mutationLock.current || unavailable) return;
+    if (act) setFormHoatDong({ name: act.name, date: act.date, points: String(act.points), password: act.password });
+    else if (dangChinhSua) setFormHoatDong(emptyForm());
+    setDangChinhSua(act ?? null);
+    setEditorError(""); setNotice(null); setEditor("single");
   };
   const doiTrangThaiCongQuet = async (act: Activity) => {
     if (mutationLock.current || loading || loadError) return;
     mutationLock.current = true; setBusyId(act.id);
-    try { await updateDoc(doc(db, "activities", act.id), { isActive: !act.isActive }); }
+    try {
+      const response = await fetch("/api/attendance/activities", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "toggle", activityId: act.id, isActive: !act.isActive }) });
+      if (!response.ok) throw Error((await response.json()).error || "Không cập nhật được trạng thái cổng.");
+    }
     catch (error) { alert(`Lỗi cập nhật trạng thái: ${errorMessage(error)}`); }
     finally { mutationLock.current = false; setBusyId(null); }
   };
   const xoaHoatDong = async (id: string, name: string) => {
     if (mutationLock.current || loading || loadError) return;
-    if ((countAttendance[id] ?? 0) > 0) {
-      alert("Hoạt động đã có điểm danh. Hãy khóa cổng để giữ lịch sử."); return;
-    }
-    if (!confirm(`Xóa hoạt động “${name}”? Thao tác này không thể hoàn tác.`)) return;
+    if (!confirm(`Lưu trữ hoạt động “${name}”? Lịch sử và đề nghị đã gửi được giữ nguyên.`)) return;
     mutationLock.current = true; setBusyId(id);
     try {
-      // Kiểm tra lại trước khi xóa. Muốn chống hoàn toàn ghi đồng thời phải thực thi ở máy chủ.
-      const records = await getDocs(query(collection(db, "attendance"), where("activityId", "==", id), limit(1)));
-      if (!records.empty) throw new Error("Hoạt động đã có điểm danh. Vui lòng khóa cổng thay vì xóa.");
-      await deleteDoc(doc(db, "activities", id));
+      const r=await fetch("/api/admin/activity",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"archive",id})});const result=await r.json();if(!r.ok)throw Error(result.error);
       if (dangChinhSua?.id === id) { setDangChinhSua(null); setFormHoatDong(emptyForm()); }
-      alert("Đã xóa hoạt động.");
+      setExpanded(null); setNotice({ text: `Đã lưu trữ hoạt động “${name}”.` });
     } catch (error) { alert(`Lỗi xóa hoạt động: ${errorMessage(error)}`); }
     finally { mutationLock.current = false; setBusyId(null); }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-800 pb-28">
-      {/* HEADER */}
-      <header className="bg-white border-b border-slate-200 px-6 py-4 shadow-xs sticky top-0 z-30">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
-          <div>
-            <h1 className="text-xl font-black text-slate-900 tracking-tight uppercase">
-              Quản Lý Hoạt Động & Sự Kiện
-            </h1>
-            <p className="text-xs text-slate-500 font-medium">
-              Khởi tạo ca trực, theo dõi danh sách điểm danh và xuất báo cáo tổng hợp
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={xuatFileTatCaHoatDong}
-              disabled={loading || !!loadError || exporting || busy}
-              className="px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold transition cursor-pointer"
-            >
-              {exporting ? "Đang xuất..." : "Xuất File Tất Cả Hoạt Động"}
-            </button>
-
-            <button
-              type="button"
-              disabled={busy || loading || !!loadError}
-              onClick={() => setIsModalThemNhieu(true)}
-              className="px-3.5 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-xs font-bold transition cursor-pointer"
-            >
-              + Thêm Nhiều Hoạt Động
-            </button>
-
-            <Link
-              href="/admin/diem-danh"
-              className="px-4 py-2 rounded-xl text-xs font-bold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition shadow-xs"
-            >
-              Bảng Điều Phối
-            </Link>
-          </div>
-        </div>
+    <div>
+      <header className={layout.pageHeader}>
+        <h1>Quản lý hoạt động</h1>
+        <button type="button" className={styles.primary} aria-label="Tạo hoạt động" aria-haspopup="dialog" disabled={unavailable} onClick={() => openForm()}>
+          <span className={styles.fullLabel}>Tạo hoạt động</span><span className={styles.shortLabel}>Tạo mới</span>
+        </button>
       </header>
+      <AttendanceSections active="manage" compact />
+      <ActivityManagementTabs />
 
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 mt-6 space-y-6">
-        <BulkAttendance />
-        {loadError && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
-          {loadError} Kiểm tra kết nối hoặc quyền truy cập rồi tải lại trang.
-          <button type="button" onClick={() => window.location.reload()} className="ml-3 underline font-bold">Tải lại</button>
-        </div>}
-        {/* KHỐI FORM TẠO HOẶC SỬA HOẠT ĐỘNG */}
-        <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-7 shadow-xs">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-5">
-            <div>
-              <h3 className="text-base font-bold text-slate-900 uppercase">
-                {dangChinhSua ? "Chỉnh Sửa Hoạt Động" : "Khởi Tạo Hoạt Động Mới"}
-              </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Thiết lập thông tin và mật mã ca trực để mở khóa máy quét QR
-              </p>
-            </div>
-            {dangChinhSua && (
-              <span className="px-3 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 text-xs font-bold">
-                Đang sửa: {dangChinhSua.name}
-              </span>
-            )}
+      <section id="danh-sach-hoat-dong" className={styles.directory} tabIndex={-1} aria-labelledby="activity-list-title">
+        <div className={styles.listHeading}>
+          <h2 id="activity-list-title" ref={listTitle} tabIndex={-1}>Danh sách hoạt động</h2>
+          {!loading && !loadError && <p>{filtered.length < activities.length ? filtered.length + "/" : ""}{activities.length} hoạt động · {matchingAttendance} lượt điểm danh</p>}
+        </div>
+        <div className={styles.toolbar}>
+          <label className={styles.search}>
+            <WorkspaceIcon name="search" />
+            <input type="search" aria-label="Tìm hoạt động theo tên" placeholder="Tìm tên…" value={query}
+              onChange={event => { setQuery(event.target.value); setPage(1); setExpanded(null); }} />
+          </label>
+          <select aria-label="Lọc trạng thái hoạt động" value={status}
+            onChange={event => { setStatus(event.target.value); setPage(1); setExpanded(null); }}>
+            <option value="all">Tất cả</option><option value="open">Đang mở</option><option value="locked">Đã khóa</option>
+          </select>
+          <button type="button" className={styles.toolsButton} aria-expanded={toolsOpen} aria-controls="activity-tools"
+            onClick={() => setToolsOpen(value => !value)}>Tiện ích <WorkspaceIcon name="more" /></button>
+        </div>
+
+        <div id="activity-tools" hidden={!toolsOpen} className={styles.toolsPanel}>
+          <div className={styles.toolButtons}>
+            <button type="button" aria-haspopup="dialog" disabled={unavailable} onClick={() => {
+              setEditorError(""); setNotice(null); setEditor("bulk");
+            }}>Thêm nhiều hoạt động</button>
+            <button type="button" onClick={xuatFileTatCaHoatDong} disabled={unavailable || exporting}>
+              <WorkspaceIcon name="export" />{exporting ? "Đang xuất…" : "Xuất tất cả ra Excel"}
+            </button>
           </div>
+          <BulkAttendance />
+        </div>
 
-          <form onSubmit={xuLyLuuHoatDong} className="text-xs">
-            <fieldset disabled={busy || loading || !!loadError} className="space-y-4 disabled:opacity-60">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="activity-field-1" className="block font-bold text-slate-700 mb-1.5 uppercase text-[11px]">
-                  Tên Hoạt Động *
+        {notice && <p role="status" className={styles.notice}>{notice.text} {notice.activityId &&
+          <Link href={"/admin/diem-danh/hoat-dong/" + encodeURIComponent(notice.activityId)}>Mở ca và danh sách điểm danh</Link>}
+        </p>}
+        {loadError ? <div role="alert" className={styles.error}>{loadError}
+          <button type="button" onClick={() => window.location.reload()}>Tải lại</button>
+        </div> : loading ? <p role="status" className={styles.empty}>Đang tải hoạt động…</p> : visible.length ? (
+          <ul className={styles.list} aria-label="Các hoạt động">
+            {visible.map(act => {
+              const count = countAttendance[act.id] ?? 0;
+              const detailHref = "/admin/diem-danh/hoat-dong/" + encodeURIComponent(act.id);
+              const actionsId = "activity-actions-" + encodeURIComponent(act.id);
+              const isExpanded = expanded === act.id;
+              return (
+                <li key={act.id}>
+                  <div className={styles.row}>
+                    <Link className={styles.identity} href={detailHref} aria-labelledby={actionsId + "-name"} aria-describedby={actionsId + "-meta"}>
+                      <strong id={actionsId + "-name"} className={styles.name}>{act.name}</strong>
+                      <span id={actionsId + "-meta"} className={styles.meta}>
+                        {act.date ? <time dateTime={act.date}>{act.date.split("-").reverse().join("/")}</time> : <span>Chưa có ngày</span>}
+                        <span>{act.points} điểm</span>
+                        <span className={styles.count}>{count} lượt</span>
+                      </span>
+                    </Link>
+                    <div className={styles.password}><small>Mật mã</small><span>{act.password || "Không yêu cầu"}</span></div>
+                    <span className={styles.state} data-open={act.isActive}>{act.isActive ? "Đang mở" : "Đã khóa"}</span>
+                    <button type="button" className={styles.more} aria-label={"Thao tác với " + act.name}
+                      aria-expanded={isExpanded} aria-controls={actionsId} onClick={() => setExpanded(isExpanded ? null : act.id)}>
+                      <WorkspaceIcon name="more" />
+                    </button>
+                  </div>
+                  <div id={actionsId} hidden={!isExpanded} className={styles.rowActions}>
+                    <p className={styles.mobilePassword}>Mật mã <strong>{act.password || "Không yêu cầu"}</strong></p>
+                    <Link href={detailHref}>Ca và điểm danh</Link>
+                    <button type="button" disabled={unavailable} aria-haspopup="dialog" onClick={() => openForm(act)}>Sửa</button>
+                    <button type="button" disabled={unavailable} onClick={() => doiTrangThaiCongQuet(act)}>{act.isActive ? "Khóa cổng" : "Mở cổng"}</button>
+                    <button type="button" className={styles.archive} disabled={unavailable} onClick={() => xoaHoatDong(act.id, act.name)}>Lưu trữ</button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        ) : activities.length ? <div role="status" className={styles.empty}>Không tìm thấy hoạt động phù hợp.
+          <button type="button" onClick={() => { setQuery(""); setStatus("all"); setPage(1); }}>Xóa bộ lọc</button>
+        </div> : <p role="status" className={styles.empty}>Chưa có hoạt động. Bấm “Tạo hoạt động” để thêm.</p>}
+
+        {!loading && !loadError && pageCount > 1 && <nav className={styles.pages} aria-label="Phân trang hoạt động">
+          <span aria-live="polite">{pageStart + 1}–{pageStart + visible.length} / {filtered.length} hoạt động</span>
+          <button type="button" disabled={currentPage === 1} onClick={() => turnPage(currentPage - 1)}>Trước</button>
+          <button type="button" disabled={currentPage === pageCount} onClick={() => turnPage(currentPage + 1)}>Sau</button>
+        </nav>}
+      </section>
+
+      <dialog ref={dialog} className={styles.editor} aria-labelledby="activity-editor-title"
+        onCancel={event => { if (mutationLock.current) event.preventDefault(); }}
+        onClose={event => { if (!event.currentTarget.open) setEditor(null); }}>
+        <div className={styles.dialogBody}>
+          <div className={styles.dialogHeading}>
+            <h2 id="activity-editor-title">{editor === "bulk" ? "Thêm nhiều hoạt động" : dangChinhSua ? "Sửa hoạt động" : "Tạo hoạt động"}</h2>
+            <button type="button" aria-label="Đóng" disabled={busy} onClick={() => setEditor(null)}><WorkspaceIcon name="close" /></button>
+          </div>
+          <form onSubmit={editor === "bulk" ? xuLyThemHangLoat : xuLyLuuHoatDong}>
+            <fieldset disabled={unavailable} className={styles.fields}>
+              {editor === "bulk" ? <div className={styles.fullField}>
+                <label htmlFor="activity-field-5">Danh sách hoạt động</label>
+                <small id="bulk-columns">Mỗi dòng gồm tên, ngày (YYYY-MM-DD), điểm và mật mã. Dán từ Excel hoặc dùng dấu phẩy hay dấu | để ngăn cột.</small>
+                <textarea id="activity-field-5" aria-describedby="bulk-columns bulk-limits" rows={5} required value={textHangLoat} onChange={event => setTextHangLoat(event.target.value)}
+                  placeholder={"Sinh hoạt đội,2026-11-21,10,1234\nTiếp sức mùa thi,2026-11-22,20,5678"} />
+                <small id="bulk-limits">Tối đa {MAX_BULK_ROWS} dòng, bỏ dòng tiêu đề. Đặt tên có dấu phân cách trong ngoặc kép. Ngày trống lấy hôm nay, điểm trống lấy 10.</small>
+              </div> : <>
+                <label className={styles.fullField}>Tên hoạt động
+                  <input id="activity-field-1" type="text" required maxLength={200} value={formHoatDong.name}
+                    onChange={event => setFormHoatDong({ ...formHoatDong, name: event.target.value })} />
                 </label>
-                <input id="activity-field-1"
-                  type="text"
-                  required
-                  value={formHoatDong.name}
-                  onChange={(e) => setFormHoatDong({ ...formHoatDong, name: e.target.value })}
-                  placeholder="Ví dụ: Sinh nhật Đội 3 tuổi / Mùa Hè Xanh 2026"
-                  className="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-xl font-bold outline-none focus:bg-white focus:border-[#0284c7] transition"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="activity-field-2" className="block font-bold text-slate-700 mb-1.5 uppercase text-[11px]">
-                  Ngày Diễn Ra *
+                <label>Ngày diễn ra
+                  <input id="activity-field-2" type="date" required readOnly={Boolean(dangChinhSua && dangChinhSua.sessionCount > 1)} value={formHoatDong.date}
+                    onChange={event => setFormHoatDong({ ...formHoatDong, date: event.target.value })} />
+                  {dangChinhSua && dangChinhSua.sessionCount > 1 && <small>Hoạt động có nhiều ca nên giữ ngày bắt đầu.</small>}
                 </label>
-                <input id="activity-field-2"
-                  type="date"
-                  required
-                  value={formHoatDong.date}
-                  onChange={(e) => setFormHoatDong({ ...formHoatDong, date: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-xl outline-none focus:bg-white focus:border-[#0284c7] transition"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="activity-field-3" className="block font-bold text-slate-700 mb-1.5 uppercase text-[11px]">
-                  Điểm Rèn Luyện / Buổi
+                <label>Điểm mỗi buổi
+                  <input id="activity-field-3" type="number" min="1" step="1" required value={formHoatDong.points}
+                    onChange={event => setFormHoatDong({ ...formHoatDong, points: event.target.value })} />
                 </label>
-                <input id="activity-field-3"
-                  type="number"
-                  min="1"
-                  step="1"
-                  required
-                  value={formHoatDong.points}
-                  onChange={(e) => setFormHoatDong({ ...formHoatDong, points: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-xl font-bold text-emerald-700 outline-none focus:bg-white focus:border-[#0284c7] transition"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="activity-field-4" className="block font-bold text-slate-700 mb-1.5 uppercase text-[11px]">
-                  Mật Mã Ca Trực (Mở Máy Quét) *
+                <label className={styles.fullField}>Mật mã điểm danh
+                  <input id="activity-field-4" type="text" maxLength={128} required={!dangChinhSua || Boolean(dangChinhSua.password)} value={formHoatDong.password}
+                    onChange={event => setFormHoatDong({ ...formHoatDong, password: event.target.value })} />
+                  {dangChinhSua && !dangChinhSua.password && <small>Hoạt động này cho phép quét khi để trống mật mã.</small>}
                 </label>
-                <input id="activity-field-4"
-                  type="text"
-                  required
-                  value={formHoatDong.password}
-                  onChange={(e) => setFormHoatDong({ ...formHoatDong, password: e.target.value })}
-                  placeholder="Ví dụ: 12345"
-                  className="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-xl font-mono font-bold outline-none focus:bg-white focus:border-[#0284c7] transition"
-                />
-              </div>
-            </div>
-
-            <div className="pt-2 flex gap-3">
-              <button
-                type="submit"
-                disabled={busy || loading || !!loadError}
-                className="px-6 py-2.5 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] text-white font-bold transition uppercase cursor-pointer disabled:opacity-60"
-              >
-                {dangLuu ? "Đang xử lý..." : dangChinhSua ? "Cập Nhật Thay Đổi" : "Tạo Hoạt Động"}
-              </button>
-
-              {dangChinhSua && (
-                <button
-                  type="button"
-                  disabled={busy || loading || !!loadError}
-                              onClick={huyChinhSua}
-                  className="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold transition cursor-pointer"
-                >
-                  Hủy Bỏ
-                </button>
-              )}
-            </div>
+              </>}
+              {(editor === "bulk" || !dangChinhSua) && <label className={styles.fullField}>
+                <span id="activity-first-session-label">{editor === "bulk" ? "Ca đầu tiên cho các hoạt động" : "Ca đầu tiên"}</span>
+                <select aria-labelledby="activity-first-session-label" value={editor === "bulk" ? bulkSession : firstSession}
+                  onChange={event => editor === "bulk" ? setBulkSession(event.target.value) : setFirstSession(event.target.value)}>
+                  {SESSION_NAMES.map(name => <option key={name}>{name}</option>)}
+                </select>
+              </label>}
             </fieldset>
+            {editorError && <p role="alert" className={styles.error}>{editorError}</p>}
+            {loadError && <p role="alert" className={styles.error}>{loadError}</p>}
+            <div className={styles.dialogActions}>
+              <button type="button" className={styles.secondary} disabled={busy} onClick={() => setEditor(null)}>Hủy</button>
+              <button type="submit" className={styles.primary} disabled={unavailable}>
+                {busy ? "Đang lưu…" : editor === "bulk" ? "Thêm hoạt động" : dangChinhSua ? "Lưu thay đổi" : "Tạo hoạt động"}
+              </button>
+            </div>
           </form>
         </div>
-
-        {/* BẢNG DANH SÁCH HOẠT ĐỘNG */}
-        <div className="bg-white border border-slate-200 rounded-3xl shadow-xs overflow-hidden">
-          <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-            <div>
-              <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                Danh Sách Hoạt Động Đã Thiết Lập ({activities.length})
-              </h3>
-              <p className="text-[11px] text-slate-400 mt-0.5">
-                Bấm vào cột điểm danh để chuyển sang trang xem chi tiết và xuất file riêng biệt
-              </p>
-            </div>
-            <span className="text-xs font-bold text-sky-700 bg-sky-50 px-3 py-1 rounded-xl border border-sky-100">
-              Tổng số lượt quét: {loadingAtt || attError ? "—" : attendanceList.length}
-            </span>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse whitespace-nowrap">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase">
-                  <th className="px-5 py-3.5">Tên Hoạt Động</th>
-                  <th className="px-5 py-3.5">Ngày Diễn Ra</th>
-                  <th className="px-5 py-3.5 text-center">Điểm</th>
-                  <th className="px-5 py-3.5 text-center">Mật Mã Trực</th>
-                  <th className="px-5 py-3.5 text-center">Đã Điểm Danh</th>
-                  <th className="px-5 py-3.5 text-center">Trạng Thái Cổng</th>
-                  <th className="px-5 py-3.5 text-right">Thao Tác</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                {loading ? (
-                  <tr>
-                    <td colSpan={7} className="text-center py-12 text-slate-400">
-                      Đang đồng bộ danh sách hoạt động từ máy chủ...
-                    </td>
-                  </tr>
-                ) : loadError ? (
-                  <tr><td colSpan={7} className="text-center py-12 text-rose-600">Không thể hiển thị dữ liệu đầy đủ. Vui lòng tải lại.</td></tr>
-                ) : activities.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="text-center py-12 text-slate-400">
-                      Chưa có hoạt động nào được tạo
-                    </td>
-                  </tr>
-                ) : (
-                  activities.map((act) => {
-                    const count = countAttendance[act.id] || 0;
-                    return (
-                      <tr key={act.id} className="hover:bg-slate-50/70 transition">
-                        <td className="px-5 py-4 font-bold text-slate-900">{act.name}</td>
-                        <td className="px-5 py-4 text-slate-600">{act.date || "Chưa cập nhật"}</td>
-                        <td className="px-5 py-4 text-center font-bold text-emerald-700">+{act.points}</td>
-                        <td className="px-5 py-4 text-center font-mono font-bold text-sky-700">{act.password || "Chưa thiết lập"}</td>
-
-                        {/* NÚT CHUYỂN TRỰC TIẾP SANG TRANG DYNAMIC ROUTE [id] */}
-                        <td className="px-5 py-4 text-center">
-                          <Link
-                            href={`/admin/diem-danh/hoat-dong/${act.id}`}
-                            className="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 font-bold text-xs transition cursor-pointer inline-flex items-center gap-1.5"
-                          >
-                            <span className="font-mono">{count}</span> lượt điểm danh
-                            <span className="text-[10px] text-emerald-600 underline">Xem chi tiết</span>
-                          </Link>
-                        </td>
-
-                        <td className="px-5 py-4 text-center">
-                          <span
-                            className={`px-2.5 py-1 rounded-md text-[11px] font-bold border ${
-                              act.isActive
-                                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                : "bg-slate-100 text-slate-500 border-slate-200"
-                            }`}
-                          >
-                            {act.isActive ? "Đang mở" : "Đã khóa"}
-                          </span>
-                        </td>
-
-                        <td className="px-5 py-4 text-right">
-                          <div className="inline-flex gap-1.5">
-                            <button
-                              type="button"
-                              disabled={busy || loading || !!loadError}
-                              onClick={() => doiTrangThaiCongQuet(act)}
-                              className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition cursor-pointer"
-                            >
-                              {act.isActive ? "Khóa" : "Mở"}
-                            </button>
-                            <button
-                              type="button"
-                              disabled={busy || loading || !!loadError}
-                              onClick={() => batDauChinhSua(act)}
-                              className="px-2.5 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 font-bold text-xs transition cursor-pointer"
-                            >
-                              Sửa
-                            </button>
-                            <button
-                              type="button"
-                              disabled={busy || loading || !!loadError}
-                              onClick={() => xoaHoatDong(act.id, act.name)}
-                              className="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-bold text-xs transition cursor-pointer"
-                            >
-                              Xóa
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </main>
-
-      {/* MODAL THÊM NHIỀU HOẠT ĐỘNG CÙNG LÚC */}
-      {isModalThemNhieu && (
-        <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div role="dialog" aria-modal="true" aria-labelledby="bulk-title" className="bg-white w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 sm:p-7 rounded-3xl border border-slate-200 shadow-2xl">
-            <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-100">
-              <div>
-                <h3 id="bulk-title" className="text-base font-bold text-slate-900 uppercase">
-                  Thêm Nhiều Hoạt Động Hàng Loạt
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Dán danh sách hoạt động cách nhau theo từng dòng
-                </p>
-              </div>
-              <button
-                type="button"
-                disabled={dangLuuHangLoat}
-                onClick={() => setIsModalThemNhieu(false)}
-                className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs cursor-pointer"
-              >
-                Đóng
-              </button>
-            </div>
-
-            <form onSubmit={xuLyThemHangLoat} className="text-xs">
-              <fieldset disabled={dangLuuHangLoat} className="space-y-4 disabled:opacity-60">
-              <div>
-                <label htmlFor="activity-field-5" className="block font-bold text-slate-700 mb-1.5 uppercase text-[11px]">
-                  Cấu trúc: Tên hoạt động, Ngày (YYYY-MM-DD), Điểm, Mật mã
-                </label>
-                <textarea id="activity-field-5"
-                  required
-                  rows={6}
-                  value={textHangLoat}
-                  onChange={(e) => setTextHangLoat(e.target.value)}
-                  placeholder={`Ví dụ:\nHội thao QNU 2026, 2026-04-15, 15, 12345\nTiếp sức mùa thi, 2026-06-25, 20, 9999\nMùa Hè Xanh, 2026-07-10, 30, 8888`}
-                  className="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl font-mono text-xs outline-none focus:bg-white focus:border-[#0284c7] transition resize-none leading-relaxed"
-                />
-                <p className="text-[11px] text-slate-400 mt-1">
-                  Tối đa 200 hoạt động/lần, không kèm dòng tiêu đề. Dùng thống nhất dấu phẩy, tab hoặc |. Tên chứa dấu phân cách phải đặt trong ngoặc kép. Ngày trống lấy ngày Việt Nam hiện tại; điểm trống lấy 10; mật mã bắt buộc.
-                </p>
-              </div>
-
-              <div className="pt-2 flex gap-3">
-                <button
-                  type="button"
-                  disabled={dangLuuHangLoat}
-                onClick={() => setIsModalThemNhieu(false)}
-                  className="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold transition cursor-pointer"
-                >
-                  Hủy Bỏ
-                </button>
-                <button
-                  type="submit"
-                  disabled={busy || loading || !!loadError}
-                  className="flex-1 py-2.5 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] text-white font-bold transition uppercase cursor-pointer disabled:opacity-60"
-                >
-                  {dangLuuHangLoat ? "Đang xử lý..." : "Xác Nhận Thêm Hàng Loạt"}
-                </button>
-              </div>
-              </fieldset>
-            </form>
-          </div>
-        </div>
-      )}
+      </dialog>
     </div>
   );
 }

@@ -19,6 +19,9 @@ const permissions = load('lib/permissions.ts');
 test('approval page is accessible to submitters but not scanners or unknown roles', () => {
   for (const role of ['Quản trị viên', 'Tổ trưởng', 'Trưởng ban Sự kiện', 'Trưởng ban Truyền thông']) {
     assert.equal(permissions.canAccess({role, to:'1'}, '/admin/duyet-diem-danh'), true);
+    const admin = role === 'Quản trị viên';
+    assert.equal(permissions.canAccess({role, to:'1'}, permissions.attendanceReviewPath), admin);
+    assert.equal(permissions.attendanceRequestsPath(role), admin ? permissions.attendanceReviewPath : '/admin/duyet-diem-danh');
   }
   for (const role of ['Quét mã', 'admin', '']) assert.equal(permissions.canAccess({role}, '/admin/duyet-diem-danh'), false);
 });
@@ -92,6 +95,14 @@ test('server sessions read live account roles and reject revocation or malformed
     '@/lib/session-token':{verifyToken:async()=>payload},'@/lib/firebase-admin':{adminDb:()=>db},'@/lib/permissions':permissions,
   });
   assert.equal((await api.readSession()).user.role,'Tổ trưởng');
+  let batches = 0;
+  db.getAll = (...refs) => { batches++; return Promise.all(refs.map(ref => ref.get())); };
+  payload = {sid, accountId:'a'};
+  assert.equal((await api.readSession()).user.role,'Tổ trưởng');
+  assert.equal(batches, 1);
+  payload = {sid, accountId:'other'};
+  assert.equal(await api.readSession(), null);
+  payload = {sid, accountId:'a'};
   records.get('admin_accounts/a').authVersion='v2'; assert.equal(await api.readSession(),null);
   records.delete('admin_accounts/a'); assert.equal(await api.readSession(),null);
   payload={sid:'a/b'}; assert.equal(await api.readSession(),null);

@@ -1,0 +1,112 @@
+/* Shared reading and interaction rules; business states keep their own colors. */
+.workspace-mobile-nav { display: none; }
+.appearance-mono .admin-content > .workspace-context { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 32px; border-bottom: 1px solid #e1e8ef; background: #fff; font-size: 13px; color: #607086; max-width: none; }
+.workspace-context strong { color: #2b4055; font-weight: 600; }
+.workspace-context span[aria-hidden] { margin-inline: 10px; color: #abb8c6; }
+.appearance-mono .admin-content { background: #f4f7fa; }
+.appearance-mono .admin-content > :is(div,main):not(.workspace-context) { max-width: 1360px; padding-top: 28px; }
+.appearance-mono .admin-content > :is(div,main) > header { position: static; background: #fff; border: 1px solid #dde5ed; border-radius: 16px; padding: 22px; box-shadow: 0 2px 8px #253b5303; }
+.appearance-mono .admin-content > :is(div,main) > header + :is(main,div) { margin-top: 24px; }
+.appearance-mono .admin-content > :is(div,main) > header > div { padding: 0; }
+.appearance-mono .admin-content :is(.rounded-2xl,.rounded-3xl).bg-white { border-color: #dde5ed; }
+.appearance-mono .admin-content .text-\[10px\],.appearance-mono .admin-content .text-\[11px\] { font-size: 12px; line-height: 1.6; }
+.appearance-mono .admin-content :is(.font-black,.font-extrabold) { font-weight: 650; }
+.appearance-mono .admin-content :is(h1,h2,h3,label) { text-transform: none; letter-spacing: normal; }
+.appearance-mono .admin-content table th { white-space: nowrap; }
+.appearance-mono .admin-content table td { font-variant-numeric: tabular-nums; }
+.appearance-mono .admin-content table td :is(button,a) { white-space: nowrap; }
+.appearance-mono .admin-content :is(.min-w-\[260px\],.min-w-\[300px\]) { min-width: min(100%,260px); }
+.appearance-mono .admin-content :is(.shadow-lg,.shadow-xl,.shadow-2xl) { box-shadow: 0 12px 40px #253d5814; }
+.appearance-mono .admin-content button:not(:disabled),.appearance-mono .admin-content summary { cursor: pointer; }
+.appearance-mono .admin-content :is(.overflow-x-auto,.overflow-auto) { scrollbar-width: thin; scrollbar-color: #b8c8d8 transparent; }
+.appearance-mono .admin-content textarea { resize: vertical; min-height: 100px; }
+.appearance-mono .admin-content input:is([type=checkbox],[type=radio]) { accent-color: #326783; }
+.appearance-mono .admin-content :is([role=status],[role=alert]) { font-size: 14px; }
+.appearance-mono .admin-content details > summary { list-style-position: inside; }
+.appearance-mono .admin-content .attendance-actions > a { transition: border-color .15s, box-shadow .15s; }
+.appearance-mono .admin-content .attendance-actions > a:hover { border-color: #8daec4; box-shadow: 0 6px 18px #24495e0a; }
+.appearance-mono .admin-content .attendance-actions h2 { font-size: 19px; }
+.appearance-mono .login-screen { background: #eef3f7; }
+.appearance-mono .login-screen > .absolute { display: none; }
+.appearance-mono .login-screen > div.relative { box-shadow: 0 20px 70px #27415c16; border: 1px solid #dae4ed; }
+.appearance-mono .login-screen form button[type=submit] { min-height: 50px; font-size: 15px; border-radius: 12px; }
+.appearance-mono .login-screen input:focus { outline: 3px solid #c4dce9; outline-offset: 2px; }
+@media (min-width: 1280px) {
+  .appearance-mono .admin-shell { grid-template-columns: 250px minmax(0,1fr); }
+  .appearance-mono .admin-nav-aside { background: #fff; padding: 28px 16px; }
+  .appearance-mono .sidebar-brand { padding-bottom: 24px; }
+  .appearance-mono .admin-nav-aside nav a { padding: 12px; }
+  .appearance-mono .sidebar-account { background: #f7f9fb; border-radius: 14px; padding: 16px; border: 1px solid #e6edf4; }
+}
+@media (max-width: 767px) {
+  .appearance-mono .admin-content > .workspace-context { padding: 12px 16px; font-size: 12px; }
+  .workspace-context-label { display: none; }
+  .appearance-mono .admin-content > :is(div,main):not(.workspace-context) { padding: 18px 14px 100px; }
+  .appearance-mono .admin-content > :is(div,main) > header { padding: 18px; }
+  .appearance-mono .admin-content > :is(div,main) > header > div { gap: 16px; }
+  .appearance-mono .admin-content > :is(div,main) > header :is(button,a) { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; }
+  .appearance-mono .admin-content [role=dialog] { padding: 12px; }
+  .appearance-mono .admin-content [role=dialog] :is(section,form) { max-width: 100%; }
+  .appearance-mono .workspace-mobile-nav { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); position: fixed; bottom: 0; left: 0; right: 0; z-index: 35; border-top: 1px solid #d8e3ed; background: #fff; padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); gap: 6px; box-shadow: 0 -4px 18px #28405908; }
+  .workspace-mobile-nav a { display: flex; align-items: center; justify-content: center; text-align: center; font-size: 12px; font-weight: 600; color: #607086; min-height: 44px; padding: 8px; border-radius: 10px; }
+  .workspace-mobile-nav a[aria-current=page] { background: #e3eff7; color: #24495e; }
+  .appearance-mono .approval-actions[data-selected=true] { bottom: calc(68px + env(safe-area-inset-bottom)); }
+}
+.workspace-skip { position: absolute; left: 16px; top: -100px; z-index: 100; padding: 12px 18px; border-radius: 10px; background: #24495e; color: #fff; }
+.workspace-skip:focus { position: fixed; top: 12px; }
+.appearance-options { padding: 8px 20px; background: #f7f9fb; color: #526276; font-size: 12px; border-bottom: 1px solid #dfe5ec; }
+.appearance-options > summary { cursor: pointer; width: fit-content; padding: 6px 0; }
+.appearance-mono .admin-shell { font-size: 14px; line-height: 1.6; }
+.appearance-mono .admin-content { user-select: text; }
+.appearance-mono .admin-content > :is(div,main) { margin-inline: auto; padding-bottom: 64px; }
+.appearance-mono .admin-content :is(h1,h2,h3) { text-wrap: balance; }
+.appearance-mono .admin-content h2 { font-weight: 650; }
+.appearance-mono .admin-content .text-xs { font-size: 13px; line-height: 1.6; }
+.appearance-mono .admin-content :is(.text-slate-400,.text-gray-400) { color: #64748b; }
+.appearance-mono .admin-content :is(button,summary) { min-height: 40px; touch-action: manipulation; }
+.appearance-mono .admin-content :is(input:not([type=checkbox]):not([type=radio]):not([type=file]),select,textarea) { font-size: 16px; line-height: 1.5; border-color: #c8d3df; background-color: #fff; color: #253449; border-radius: 10px; min-width: 0; }
+.appearance-mono .admin-content :is(input:not([type=checkbox]):not([type=radio]),select) { min-height: 44px; }
+.appearance-mono .admin-content input::placeholder,.appearance-mono .admin-content textarea::placeholder { color: #69798c; font-weight: 400; }
+.appearance-mono :is(button,a,input,select,textarea,summary):focus-visible { outline: 3px solid #75a8c4; outline-offset: 3px; }
+.appearance-mono button:disabled { cursor: not-allowed; }
+.appearance-mono .admin-content table { font-size: 14px; line-height: 1.55; }
+.appearance-mono .admin-content table th { background: #f3f6fa; color: #46576c; font-weight: 600; }
+.appearance-mono .admin-content table td { border-color: #e8edf3; }
+.appearance-mono .admin-content tbody tr:hover { background: #f4f8fc; }
+.appearance-mono .admin-content td.font-bold { font-weight: 600; }
+.appearance-mono .admin-content [role=alert] { line-height: 1.65; overflow-wrap: anywhere; }
+.appearance-mono .admin-content [role=dialog] { overscroll-behavior: contain; }
+.appearance-mono .admin-content [role=dialog] > section { box-shadow: 0 20px 70px #20334b26; }
+.appearance-mono .admin-navigation { box-shadow: 0 2px 12px #22384f06; }
+.appearance-mono .admin-navigation > div:first-child { min-height: 68px; height: auto; padding-block: 10px; }
+.appearance-mono .admin-navigation #mobile-admin-menu a[aria-current=page] { background: #e3eff7; color: #24495e; }
+.appearance-mono .sidebar-brand small,.appearance-mono .sidebar-account small { font-size: 12px; }
+.appearance-mono .admin-nav-aside nav a { font-size: 14px; min-height: 48px; }
+.appearance-mono .sidebar-section-label { font-size: 12px; }
+.workspace-tabs { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px; border: 1px solid #dfe5ec; border-radius: 16px; background: #fff; }
+.workspace-tabs > :is(button,a) { display: flex; align-items: center; justify-content: center; flex: 1 1 120px; min-height: 46px; padding: 10px 14px; border-radius: 10px; font-size: 14px; font-weight: 600; color: #526276; text-align: center; }
+.workspace-tabs > :is(button,a):hover { background: #f3f6fa; }
+.workspace-tabs > button[aria-pressed=true] { background: #e3eff7; color: #24495e; box-shadow: inset 0 -2px #437e9e; }
+.appearance-mono .department-workspace > header { position: static; border: 1px solid #dfe5ec; border-radius: 16px; box-shadow: none; padding: 22px; }
+.appearance-mono .department-workspace > main { padding-inline: 0; }
+.appearance-mono .login-screen label { font-size: 13px; text-transform: none; letter-spacing: normal; }
+.appearance-mono .login-screen input { font-size: 16px; min-height: 48px; }
+.appearance-mono .login-screen p { font-size: 14px; line-height: 1.65; }
+@media (max-width: 767px) {
+  .appearance-mono .admin-content > :is(div,main) { padding: 18px 14px 48px; }
+  .appearance-mono .admin-content :is(button,summary) { min-height: 44px; }
+  .appearance-mono .admin-content h1 { font-size: 24px; }
+  .appearance-mono .admin-content h2 { font-size: 18px; }
+  .appearance-mono .admin-content table { font-size: 13px; }
+  .appearance-mono .admin-content table :is(th,td) { padding: 12px; }
+  .workspace-tabs > :is(button,a) { flex-basis: calc(50% - 6px); padding-inline: 8px; }
+  .appearance-mono .department-workspace > header { padding: 18px; }
+  .appearance-mono .admin-content > :is(div,main) > header.sticky { position: static; }
+  .appearance-mono .login-screen > div.relative > div:first-child { padding: 24px 20px; }
+  .appearance-mono .login-screen > div.relative > div:first-child h2 { margin-top: 12px; font-size: 16px; }
+  .appearance-mono .login-screen > div.relative > div:first-child .w-28 { width: 64px; height: 64px; }
+  .appearance-mono .login-screen > div.relative > div:first-child > div:last-child { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .appearance-mono .admin-shell *, .appearance-mono .login-screen * { scroll-behavior: auto; transition-duration: 0s; animation-duration: 0s; }
+}

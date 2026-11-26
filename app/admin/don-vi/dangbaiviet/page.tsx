@@ -1,4 +1,5 @@
 'use client';
+import NextImage from "next/image";
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
@@ -85,7 +86,13 @@ export default function DangBaiVietPage() {
   };
 
   useEffect(() => {
+    // Batch resource initialization after commit and cancel stale route setup.
+    let dispose: void | (() => void);
+    const setup = setTimeout(() => { dispose = (() => {
     loadActivities();
+  
+    })(); }, 0);
+    return () => { clearTimeout(setup); dispose?.(); };
   }, []);
 
   const compressImageFile = async (file: File): Promise<string> => {
@@ -284,10 +291,11 @@ export default function DangBaiVietPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-          <div className="bg-slate-100 p-1 rounded-xl flex items-center text-xs font-bold">
+          <div className="compact-segments" role="group" aria-label="Bài viết">
             <button
               type="button"
               onClick={() => setActiveTab('soan-thao')}
+              aria-pressed={activeTab === 'soan-thao'}
               className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer ${
                 activeTab === 'soan-thao' ? 'bg-[#0284c7] text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
               }`}
@@ -297,6 +305,7 @@ export default function DangBaiVietPage() {
             <button
               type="button"
               onClick={() => setActiveTab('xem-truoc')}
+              aria-pressed={activeTab === 'xem-truoc'}
               className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer ${
                 activeTab === 'xem-truoc' ? 'bg-[#0284c7] text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
               }`}
@@ -352,7 +361,7 @@ export default function DangBaiVietPage() {
                 <div className="flex items-center justify-center p-2 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50 relative overflow-hidden aspect-[16/10]">
                   {form.anhDaiDien ? (
                     <div className="relative w-full h-full rounded-xl overflow-hidden">
-                      <img src={form.anhDaiDien} alt="Preview" className="w-full h-full object-cover" />
+                      <NextImage unoptimized width={800} height={600} src={form.anhDaiDien} alt="Preview" className="w-full h-full object-cover" />
                       <button
                         type="button"
                         onClick={() => setForm((prev) => ({ ...prev, anhDaiDien: '' }))}
@@ -534,7 +543,7 @@ export default function DangBaiVietPage() {
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 bg-slate-50 border border-slate-200 rounded-2xl">
                   {form.danhSachAnhPhu.map((src, i) => (
                     <div key={i} className="relative aspect-[16/10] rounded-xl overflow-hidden border border-slate-200 group">
-                      <img src={src} alt={`Ảnh phụ ${i + 1}`} className="w-full h-full object-cover" />
+                      <NextImage unoptimized width={800} height={600} src={src} alt={`Ảnh phụ ${i + 1}`} className="w-full h-full object-cover" />
                       <button
                         type="button"
                         onClick={() =>
@@ -578,12 +587,12 @@ export default function DangBaiVietPage() {
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               MÔ PHỎNG HIỂN THỊ THỰC TẾ
             </span>
-            <span className="text-[10px] text-slate-400 font-mono">/hoat-dong/chi-tiet</span>
+            <span className="text-[11px] text-slate-400 font-mono">/hoat-dong/chi-tiet</span>
           </div>
 
           <div className="p-6 sm:p-8 space-y-6">
             <div className="space-y-2 border-b border-slate-100 pb-4">
-              <span className="text-[10px] font-black uppercase text-[#0284c7] bg-sky-50 px-2.5 py-0.5 rounded-md border border-sky-100">
+              <span className="text-[11px] font-black uppercase text-[#0284c7] bg-sky-50 px-2.5 py-0.5 rounded-md border border-sky-100">
                 ĐỘI THANH NIÊN TÌNH NGUYỆN QNU
               </span>
               <h1 className="text-xl sm:text-2xl font-black text-slate-900 uppercase">
@@ -594,7 +603,7 @@ export default function DangBaiVietPage() {
 
             {form.anhDaiDien && (
               <div className="w-full aspect-[16/9] rounded-2xl overflow-hidden border border-slate-200">
-                <img src={form.anhDaiDien} alt="Banner" className="w-full h-full object-cover" />
+                <NextImage unoptimized width={800} height={600} src={form.anhDaiDien} alt="Banner" className="w-full h-full object-cover" />
               </div>
             )}
 
@@ -614,7 +623,7 @@ export default function DangBaiVietPage() {
                 <div className="grid grid-cols-2 gap-3">
                   {form.danhSachAnhPhu.map((src, i) => (
                     <div key={i} className="aspect-[16/10] rounded-xl overflow-hidden border border-slate-200">
-                      <img src={src} alt="" className="w-full h-full object-cover" />
+                      <NextImage unoptimized width={800} height={600} src={src} alt="" className="w-full h-full object-cover" />
                     </div>
                   ))}
                 </div>
@@ -644,7 +653,7 @@ export default function DangBaiVietPage() {
                 className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col justify-between space-y-3 hover:border-[#0284c7]/40 transition"
               >
                 <div className="flex items-start gap-3">
-                  <img
+                  <NextImage unoptimized width={800} height={600}
                     src={item.anhDaiDien || '/logo.png'}
                     alt={item.tieuDe}
                     className="w-14 h-12 object-cover rounded-lg shrink-0 border border-slate-200 bg-white"

@@ -1,0 +1,31 @@
+.actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.gate { margin-bottom: 12px; color: #785015; font-size: 13px; }
+.filters { display: grid; gap: 5px; }
+.filters > div { border: 0; padding: 0; }
+.filters > div > label { display: grid; gap: 4px; max-width: 27rem; color: var(--ink); font-size: 13px; }
+.filters select, .filters input { min-width: 0; max-width: 100%; min-height: 38px; padding: 6px 9px; border-radius: 8px; }
+.filters > details > summary { min-height: 38px; }
+.filters > details > section { min-width: 0; padding: 12px; box-shadow: none; }
+.filters textarea { min-width: 0; max-width: 100%; }
+.history { margin-top: 18px; min-width: 0; }
+.history > label { margin: 8px 0; max-width: 27rem; }
+.entries { list-style: none; margin: 0; padding: 0; }
+.entries li { border-bottom: 1px solid #e7ecf3; }
+.entries summary { display: grid; grid-template-columns: minmax(0,1.65fr) minmax(0,1fr) 16px; gap: 8px; align-items: center; list-style: none; padding: 7px 4px; min-height: 48px; cursor: pointer; }
+.entries summary::-webkit-details-marker { display: none; }
+.entries summary:hover { background: #f4f7fc; }
+.identity, .shift { display: grid; gap: 2px; overflow-wrap: anywhere; }
+.identity strong { font-size: 14px; font-weight: 650; color: #214f92; }
+.shift strong { font-size: 13px; font-weight: 550; color: var(--ink); }
+.entries small, .expanded dt { color: var(--muted); font-size: 12px; }
+.chevron { justify-self: center; color: #4a6488; font-size: 20px; line-height: 1; }
+.entries details[open] > summary .chevron { transform: rotate(90deg); }
+.expanded { padding: 4px 8px 10px; }
+.expanded dl { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,155px),1fr)); gap: 7px 12px; }
+.expanded dd { font-size: 13px; color: var(--ink); overflow-wrap: anywhere; }
+.remove { color: #963a35; min-height: 36px; padding-inline: 8px; margin-top: 6px; font-size: 12px; font-weight: 600; }
+.candidate { margin-top: 10px; padding: 8px 10px; border-radius: 8px; background: #eef5fd; color: #244c7b; font-size: 13px; overflow-wrap: anywhere; }
+@media (max-width: 760px) {
+  .filters select, .filters input, .filters > details > summary, .remove { min-height: 44px; }
+  .filters :is(select,input,textarea) { font-size: 16px; }
+}

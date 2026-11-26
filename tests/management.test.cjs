@@ -46,3 +46,12 @@ test('report and global history deny leaders and scanners before reading data',a
  const f=fixture();for(const role of ['Tổ trưởng','Trưởng ban Sự kiện','Trưởng ban Truyền thông','Quét mã']){f.session.user.role=role;for(const mode of ['report','history']){const r=await f.GET(new Request(`http://localhost/api/management?mode=${mode}&month=2026-10`));assert.equal(r.status,403);}}
  const permissions=load('lib/permissions.ts');assert.equal(permissions.canAccess({role:'Tổ trưởng',to:'1'},'/admin/quan-ly'),true);assert.equal(permissions.canAccess({role:'Quét mã'},'/admin/quan-ly'),false);
 });
+
+
+test('department leaders cannot request transfers, even for their own department',async()=>{
+ for(const role of ['Trưởng ban Sự kiện','Trưởng ban Truyền thông']){
+  const f=fixture();f.session.user.role=role;f.records.get('admin_accounts/a').role=role;
+  for(const ban of ['bansukien','bantruyenthong']){f.records.get('users/m').ban_id=[ban];await assert.rejects(f.transferMember(transfer),e=>e.status===403);}
+  assert.equal(f.records.has('member_transfer_requests/m'),false);
+ }
+});

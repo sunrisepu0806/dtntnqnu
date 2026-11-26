@@ -29,3 +29,12 @@ test('pending approval is never shown as saved and does not resubmit on retryFai
   q.enqueue('a','a');await tick();assert.equal(q.snapshot()[0].state,'pending');
   q.retryFailed();await tick();assert.equal(calls,1);
 });
+
+test('a rejected code (unknown MSSV) is never retried', async () => {
+  const { CheckInQueue: Queue, CheckInRejected } = load('lib/check-in-queue.ts');
+  let calls = 0;
+  const q = new Queue(async () => { calls++; throw new CheckInRejected('Không tìm thấy MSSV.'); }, () => {});
+  q.enqueue('123', '123'); await tick();
+  assert.equal(q.snapshot()[0].state, 'rejected'); assert.equal(q.snapshot()[0].error, 'Không tìm thấy MSSV.');
+  q.retryFailed(); await tick(); assert.equal(calls, 1);
+});

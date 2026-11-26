@@ -1,4 +1,5 @@
 'use client';
+import NextImage from "next/image";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import dynamic from 'next/dynamic';
@@ -30,32 +31,7 @@ const Popup = dynamic(
   { ssr: false }
 );
 
-const LocationPicker = ({ onSelectLocation }: { onSelectLocation: (lat: number, lng: number) => void }) => {
-  const [useMapEventsHook, setUseMapEventsHook] = useState<any>(null);
-
-  useEffect(() => {
-    let mounted = true;
-    import('react-leaflet').then((mod) => {
-      if (mounted) setUseMapEventsHook(() => mod.useMapEvents);
-    });
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  if (!useMapEventsHook) return null;
-
-  const MapEventsComponent = () => {
-    useMapEventsHook({
-      click(e: any) {
-        onSelectLocation(e.latlng.lat, e.latlng.lng);
-      },
-    });
-    return null;
-  };
-
-  return <MapEventsComponent />;
-};
+const LocationPicker = dynamic(() => import("@/components/admin/LocationPicker"), { ssr: false });
 
 export interface LocationItem {
   id: string;
@@ -87,7 +63,7 @@ function extractCoordsFromGoogleMaps(input: string): [number, number] | null {
 
 export default function QuanLyDinhViPage() {
   const [mounted, setMounted] = useState(false);
-  const [leafletLib, setLeafletLib] = useState<any>(null);
+  const [leafletLib, setLeafletLib] = useState<typeof import("leaflet") | null>(null);
   const [locations, setLocations] = useState<LocationItem[]>([]);
   const [selectedPos, setSelectedPos] = useState<[number, number] | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -267,9 +243,9 @@ export default function QuanLyDinhViPage() {
       setMapUrlInput('');
       setSelectedPos(null);
       alert('Đã ghim điểm mới lên Firebase thành công!');
-    } catch (err: any) {
+    } catch (err) {
       console.error('Lỗi khi lưu Firestore:', err);
-      alert(`Lỗi: ${err.message || 'Không thể lưu lên cơ sở dữ liệu.'}`);
+      alert(`Lỗi: ${(err instanceof Error ? err.message : String(err)) || 'Không thể lưu lên cơ sở dữ liệu.'}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -395,7 +371,7 @@ export default function QuanLyDinhViPage() {
               <div className="flex flex-col items-center justify-center p-3 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50 relative overflow-hidden">
                 {form.hinhAnh ? (
                   <div className="relative w-full h-32">
-                    <img src={form.hinhAnh} alt="Preview" className="w-full h-full object-cover rounded-xl" />
+                    <NextImage unoptimized width={800} height={600} src={form.hinhAnh} alt="Preview" className="w-full h-full object-cover rounded-xl" />
                     <button
                       type="button"
                       onClick={() => setForm((prev) => ({ ...prev, hinhAnh: '' }))}
@@ -523,7 +499,7 @@ export default function QuanLyDinhViPage() {
                     key={loc.id}
                     className="p-3 rounded-2xl bg-slate-50 border border-slate-100 flex items-start gap-3 hover:border-slate-300 transition"
                   >
-                    <img
+                    <NextImage unoptimized width={800} height={600}
                       src={loc.hinhAnh}
                       alt={loc.ten}
                       className="w-16 h-16 object-cover rounded-xl shrink-0 border border-slate-200"
@@ -557,7 +533,7 @@ export default function QuanLyDinhViPage() {
 
                       <p className="text-xs text-slate-500 line-clamp-1">{loc.moTa}</p>
 
-                      <div className="text-[10px] text-slate-400 flex items-center gap-1 font-mono pt-0.5">
+                      <div className="text-[11px] text-slate-400 flex items-center gap-1 font-mono pt-0.5">
                         <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
                         [{loc.toaDo[0]}, {loc.toaDo[1]}]
                         {loc.thoiGian && ` • ${loc.thoiGian}`}

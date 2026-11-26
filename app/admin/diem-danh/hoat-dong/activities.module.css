@@ -1,0 +1,109 @@
+.primary, .secondary, .toolsButton, .toolButtons button, .rowActions :is(a,button), .pages button {
+  display: inline-flex; justify-content: center; align-items: center; gap: 6px;
+  min-height: 36px; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 600;
+}
+.primary { background: var(--blue); color: white; }
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 16px; border-bottom: 1px solid #e5ebf4; scroll-margin-top: 12px; }
+.tabs a { display: inline-flex; align-items: center; min-height: 40px; padding: 6px 10px; border-bottom: 2px solid transparent; font-size: 13px; font-weight: 600; color: #546884; }
+.tabs a[aria-current=page] { color: #1657aa; border-bottom-color: #2563be; }
+.tabs a:hover { background: #f2f6fc; }
+.tabs + .directory, .review { margin-top: 14px; }
+.review { min-width: 0; }
+.reviewScope { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 2px 12px; margin-bottom: 6px; color: #215b9e; font-size: 13px; }
+.reviewScope a { display: inline-flex; align-items: center; min-height: 40px; text-decoration: underline; overflow-wrap: anywhere; }
+@media (max-width: 760px) {
+  .tabs { margin-top: 8px; }
+  .tabs a { min-height: 44px; }
+}
+.shortLabel { display: none; }
+.primary:hover:not(:disabled) { background: #184fa6; }
+.secondary, .toolsButton, .toolButtons button, .rowActions :is(a,button), .pages button { background: #eef3fb; color: #20599e; }
+.secondary:hover, .toolsButton:hover, .toolsButton[aria-expanded=true], .toolButtons button:hover, .rowActions :is(a,button):hover, .pages button:hover:not(:disabled) { background: #dfebfb; }
+.primary:disabled, .secondary:disabled, .directory button:disabled { opacity: .55; }
+
+.directory { min-width: 0; container-type: inline-size; margin-top: 23px; scroll-margin-top: 12px; outline: none; }
+.listHeading, .dialogHeading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; }
+.listHeading h2, .dialogHeading h2 { color: var(--ink); font-size: 16px; font-weight: 650; }
+.listHeading h2 { scroll-margin-top: 12px; }
+.directory .listHeading h2 { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); }
+.listHeading p { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.toolbar { display: grid; grid-template-columns: minmax(0, 340px) auto auto; justify-content: start; gap: 8px; align-items: center; margin: 10px 0 8px; }
+.search { display: flex; align-items: center; gap: 7px; min-width: 0; padding: 0 10px; border-radius: 8px; background: #f1f3f8; color: var(--muted); }
+.search svg, .toolsButton svg, .toolButtons svg, .more svg { width: 17px; height: 17px; flex: none; }
+.search:focus-within { outline: 2px solid #5393e7; outline-offset: 1px; }
+.search input { width: 100%; min-width: 0; min-height: 36px; border: 0; background: transparent; color: var(--ink); font-size: 13px; }
+.directory .search input:focus-visible { outline: none; }
+.toolbar select { min-height: 36px; max-width: 100%; padding-inline: 8px 4px; border: 0; border-radius: 8px; background: #f1f3f8; color: var(--ink); font-size: 12px; }
+.toolsPanel { margin: 0 0 8px; padding: 12px; border-radius: 9px; background: #f5f7fb; }
+.toolButtons { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+.toolsPanel > details > summary { min-height: 36px; }
+.toolsPanel > details > section { min-width: 0; padding: 12px; box-shadow: none; }
+.toolsPanel :is(select,input,textarea) { max-width: 100%; min-width: 0; }
+
+.list { margin: 0; padding: 0; list-style: none; }
+.list li { border-bottom: 1px solid #e9edf4; }
+.row { display: grid; grid-template-columns: minmax(0,1fr) minmax(90px,150px) auto 38px; gap: 12px; align-items: center; padding: 5px 0; }
+.identity { min-width: 0; min-height: 44px; display: flex; flex-direction: column; align-items: start; justify-content: center; }
+.name { display: inline-block; padding: 4px 0 2px; font-size: 14px; font-weight: 650; color: #214f92; overflow-wrap: anywhere; }
+.identity:hover .name { text-decoration: underline; }
+.meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 0; color: var(--muted); font-size: 12px; }
+.meta > * { white-space: nowrap; }
+.meta > * + *::before { content: "·"; margin-inline: 6px; color: #8290a2; }
+.count { color: #245d9e; }
+.password { min-width: 0; font-size: 12px; overflow-wrap: anywhere; }
+.password small { display: block; color: var(--muted); font-size: 12px; }
+.state { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; white-space: nowrap; color: #576879; }
+.state::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #8491a0; }
+.state[data-open=true] { color: #21664e; }
+.state[data-open=true]::before { background: #2b8a68; }
+.more { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 8px; color: #42638d; }
+.more:hover, .more[aria-expanded=true] { color: #1a54a3; background: #e8f0fc; }
+.rowActions:not([hidden]) { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; padding: 2px 0 9px; }
+.rowActions .archive { color: #a13c3b; background: #fcf0ee; }
+.rowActions .archive:hover { background: #f9e1df; }
+.mobilePassword { display: none; overflow-wrap: anywhere; font-size: 12px; color: var(--muted); }
+.mobilePassword strong { color: var(--ink); font-weight: 600; }
+.empty, .notice, .error { padding: 10px 0; color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+.notice { color: #21664e; }
+.notice a { display: inline-block; color: #20599e; text-decoration: underline; }
+.error { color: #a43731; }
+.error button, .empty button { min-height: 36px; margin-inline-start: 8px; color: #20599e; font-weight: 600; text-decoration: underline; }
+.pages { display: flex; align-items: center; gap: 5px; margin-top: 10px; font-size: 12px; color: var(--muted); }
+.pages span { margin-right: auto; }
+
+.editor { position: fixed; inset: 0; width: min(460px,calc(100% - 24px)); max-height: calc(100dvh - 24px); overflow: auto; overscroll-behavior: contain; margin: auto; padding: 0; border: 0; border-radius: 14px; background: white; color: var(--ink); box-shadow: 0 16px 55px #123a6740; }
+.editor::backdrop { background: #18355465; }
+.dialogBody { padding: 18px; }
+.dialogHeading { margin-bottom: 10px; }
+.dialogHeading button { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 8px; color: #385675; background: #f1f3f8; }
+.dialogHeading svg { width: 17px; height: 17px; }
+.fields { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; min-width: 0; }
+.fields label { display: grid; align-content: start; gap: 5px; min-width: 0; color: var(--ink); font-size: 13px; font-weight: 600; }
+.fields small { color: var(--muted); font-size: 12px; font-weight: 400; line-height: 1.5; }
+.fields :is(input,textarea,select) { width: 100%; min-width: 0; min-height: 40px; padding: 7px 9px; border: 1px solid #cbd6e4; border-radius: 8px; background: white; color: var(--ink); font-size: 14px; font-weight: 400; }
+.fields input:read-only { background: #f4f6f9; color: var(--muted); }
+.fields textarea { resize: vertical; }
+.fullField { grid-column: 1 / -1; display: grid; gap: 5px; }
+.dialogActions { display: flex; justify-content: end; gap: 8px; margin-top: 16px; }
+@container (max-width: 600px) {
+  .password { display: none; }
+  .mobilePassword { display: block; flex-basis: 100%; }
+  .row { grid-template-columns: minmax(0,1fr) auto 44px; gap: 6px; }
+}
+@media (max-width: 760px) {
+  .directory { margin-top: 16px; }
+  .toolbar { grid-template-columns: minmax(0,1fr) auto auto; gap: 5px; }
+  .listHeading { gap: 2px 8px; }
+  .listHeading h2 { font-size: 15px; }
+  .listHeading p, .meta, .state { font-size: 12px; }
+  .search input, .fields :is(input,textarea,select) { font-size: 16px; }
+  .primary, .secondary, .search input, .toolbar select, .toolsButton, .toolButtons button, .toolsPanel > details > summary,
+  .rowActions :is(a,button), .pages button, .error button, .empty button, .fields input { min-height: 44px; }
+  .more, .dialogHeading button { width: 44px; height: 44px; }
+  .toolsButton { padding-inline: 9px; }
+  .dialogBody { padding: 14px; }
+}
+@media (max-width: 370px) {
+  .fullLabel { display: none; }
+  .shortLabel { display: inline; }
+}

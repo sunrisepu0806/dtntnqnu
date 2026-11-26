@@ -1,549 +1,298 @@
 "use client";
 
-import { useState, useEffect, useMemo, use } from "react";
-import { 
-  collection, 
-  doc, 
-  onSnapshot, 
-  query, 
-  where,
-} from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import Link from "next/link";
+import { use, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { collection, doc, onSnapshot, query, where, type Timestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { activityFlow, activitySessions, type ActivitySession } from "@/lib/activity-model";
+import { attendanceDay } from "@/lib/attendance-day";
+import { cleanId, directoryMembers, type Member } from "@/lib/member-directory";
+import { searchKey } from "@/lib/search-text";
+import { activityManagementPath, attendanceReviewPath } from "@/lib/permissions";
+import ActivitySessions from "@/components/admin/ActivitySessions";
 import BulkAttendance from "@/components/admin/BulkAttendance";
+import { WorkspaceIcon } from "@/components/admin/workspace-navigation";
+import layout from "../../attendance.module.css";
+import styles from "../activities.module.css";
+import detail from "./detail.module.css";
 
-interface Activity {
-  id: string;
-  name: string;
-  date: string;
-  points: number;
-  password?: string;
-  isActive: boolean;
-}
-
-interface UserProfile {
-  id: string;
-  studentId: string;
-  fullName: string;
-  majorAndClass: string;
-  department: string;
-  group?: string;
-  specialty?: string;
-}
-
-interface AttendanceItem {
-  id: string;
-  activityId: string;
-  studentId: string;
-  memberName: string;
-  scannerName?: string;
-  scannerMssv?: string;
-  timestamp?: any;
-}
-
-// Hàm chuẩn hóa chuỗi Ngành / Lớp
-const formatMajorClass = (rawMajor: any, rawClass: any): string => {
-  const major = String(rawMajor || "").trim();
-  const className = String(rawClass || "").trim();
-  if (major && className && !major.toLowerCase().includes(className.toLowerCase())) {
-    return `${major} - ${className}`;
-  }
-  return major || className || "Chưa cập nhật";
+type Activity = {
+  name: string; date: string; points: number; password: string;
+  isActive: boolean; archived: boolean; sessions: ActivitySession[];
+};
+type CheckIn = {
+  id: string; memberId: string; studentId: string; memberName: string;
+  sessionId: string; sessionDate: string; sessionName: string; date?: string;
+  scannerName: string; scannerMssv: string; timestamp?: Timestamp; createdAt?: Timestamp;
 };
 
-// Hàm chuẩn hóa Tổ: chỉ hiển thị số 1, 2, 3, 4, 5 hoặc TNV
-const formatGroupNumber = (val: any): string => {
-  if (!val) return "TNV";
-  const str = String(val).trim().toUpperCase();
-  if (str.includes("TNV") || str.includes("TỰ DO") || str.includes("TU DO")) return "TNV";
-  const num = str.replace(/[^0-9]/g, "");
-  return num ? num : "TNV";
-};
+const displayDay = (day: string) => day ? day.split("-").reverse().join("/") : "Chưa ghi ngày";
+const clock = new Intl.DateTimeFormat("vi-VN", { dateStyle: "short", timeStyle: "medium", timeZone: "Asia/Ho_Chi_Minh" });
 
-export default function TrangChiTietHoatDong({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const resolvedParams = use(params);
-  const activityId = resolvedParams.id;
-
-  const [activity, setActivity] = useState<Activity | null>(null);
-  const [attendanceList, setAttendanceList] = useState<AttendanceItem[]>([]);
-  const [userProfiles, setUserProfiles] = useState<UserProfile[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [tuKhoa, setTuKhoa] = useState("");
-
-  // Modal thêm thành viên
-  const [isModalThem, setIsModalThem] = useState(false);
-  const [mssvCanThem, setMssvCanThem] = useState("");
-  const [dangThem, setDangThem] = useState(false);
-
-  // Người quét hiện tại
-  const [currentUser, setCurrentUser] = useState({
-    name: "Ban cán sự",
-    mssv: "admin",
+async function changeAttendance(method: "POST" | "DELETE", body: Record<string, string>) {
+  const response = await fetch("/api/attendance/manual", {
+    method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
   });
+  const result = await response.json();
+  if (!response.ok) throw Error(result.error || "Chưa lưu được thay đổi.");
+  return result;
+}
+
+export default function ActivityDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
+  const [attempt, setAttempt] = useState(0);
+  return <ActivityDetail key={id + ":" + attempt} activityId={id} retry={() => setAttempt(n => n + 1)} />;
+}
+
+function ActivityDetail({ activityId, retry }: { activityId: string; retry: () => void }) {
+  const [activity, setActivity] = useState<Activity | null>();
+  const [history, setHistory] = useState<CheckIn[] | null>(null);
+  const [profiles, setProfiles] = useState<Member[] | null>(null);
+  const [readError, setReadError] = useState("");
+  const [sessionId, setSessionId] = useState("");
+  const [search, setSearch] = useState("");
+  const [requestedDirectory, setRequestedDirectory] = useState(false);
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualSession, setManualSession] = useState("");
+  const [student, setStudent] = useState("");
+  const [manualError, setManualError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const dialog = useRef<HTMLDialogElement>(null);
+  const mutationLock = useRef(false);
+  const found = Boolean(activity);
+  const canCorrect = found && !activity?.archived;
+  const needsDirectory = requestedDirectory || Boolean(history?.length);
+
+  useEffect(() => onSnapshot(doc(db, "activities", activityId), snapshot => {
+    const data = snapshot.data();
+    setActivity(data && activityFlow(data) === "group" ? {
+      name: data.name || data.title || "Hoạt động chưa đặt tên", date: data.date || "",
+      points: Number(data.points ?? 10), password: data.password || "",
+      isActive: data.isActive === true, archived: data.archived === true, sessions: activitySessions(data),
+    } : null);
+  }, () => setReadError("Chưa tải được hoạt động.")), [activityId]);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const session = localStorage.getItem("user_session");
-      if (session) {
-        try {
-          const parsed = JSON.parse(session);
-          setCurrentUser({
-            name: parsed.name || "Ban cán sự",
-            mssv: parsed.mssv || "admin",
-          });
-        } catch (e) {
-          console.error(e);
-        }
-      }
-    }
-
-    // 1. Lắng nghe thông tin hoạt động
-    const unsubAct = onSnapshot(doc(db, "activities", activityId), (snapDoc) => {
-      if (snapDoc.exists()) {
-        const d = snapDoc.data();
-        setActivity({
-          id: snapDoc.id,
-          name: d.name || d.title || "Chưa đặt tên",
-          date: d.date || "Chưa cập nhật",
-          points: Number(d.points || 10),
-          password: d.password || "123",
-          isActive: d.isActive !== false,
+    if (!found) return;
+    const ledger = query(collection(db, "attendance"), where("activityId", "==", activityId));
+    return onSnapshot(ledger, snapshot => {
+      const items: CheckIn[] = [];
+      for (const record of snapshot.docs) {
+        const d = record.data();
+        if (d.archived === true) continue;
+        items.push({
+          id: record.id, memberId: String(d.memberId || ""), studentId: String(d.studentId || d.mssv || "").trim(),
+          memberName: d.memberName || d.fullName || "", sessionId: d.sessionId || "legacy",
+          sessionDate: d.sessionDate || "", sessionName: d.sessionName || "", date: d.date,
+          scannerName: d.scannerName || "", scannerMssv: d.scannerMssv || "", timestamp: d.timestamp, createdAt: d.createdAt,
         });
       }
-    });
+      setHistory(items);
+    }, () => setReadError("Chưa tải được lịch sử điểm danh."));
+  }, [found, activityId]);
 
-    // 2. Lắng nghe danh sách điểm danh
-    const qAtt = query(
-      collection(db, "attendance"),
-      where("activityId", "==", activityId)
-    );
-    const unsubAtt = onSnapshot(qAtt, (snap) => {
-      const list: AttendanceItem[] = snap.docs.map((d) => ({
-        id: d.id,
-        activityId: d.data().activityId,
-        studentId: String(d.data().studentId || d.data().mssv || "").trim(),
-        memberName: d.data().memberName || d.data().fullName || "Thành viên",
-        scannerName: d.data().scannerName || "Ban cán sự",
-        scannerMssv: d.data().scannerMssv || "",
-        timestamp: d.data().timestamp,
-      }));
-      setAttendanceList(list);
-      setLoading(false);
-    });
-
-    // 3. Lắng nghe thông tin người dùng từ users (đầy đủ Ngành, Lớp, Ban, Tổ, Mảng)
-    const unsubUsers = onSnapshot(collection(db, "users"), (snap) => {
-      const users: UserProfile[] = snap.docs.map((d) => {
-        const data = d.data();
-        
-        // Nhận diện ban
-        let dept = data.department || "";
-        if (!dept && Array.isArray(data.ban_id)) {
-          dept = data.ban_id.includes("bantruyenthong") ? "Truyền thông" : "Sự kiện";
-        }
-
-        // Nhận diện ngành và lớp
-        const rawMajor = data.majorAndClass || data.major || data.nganhHoc || data.nganh || "";
-        const rawClass = data.className || data.class || data.lop || "";
-
-        return {
-          id: d.id,
-          studentId: String(data.mssv || data.studentId || d.id).trim(),
-          fullName: data.name || data.fullName || data.hoTen || "Thành viên",
-          majorAndClass: formatMajorClass(rawMajor, rawClass),
-          department: dept || "Chưa xếp ban",
-          group: data.to_id || data.group || "",
-          specialty: data.mangChuyenMon || data.specialty || "Chưa phân mảng",
-        };
+  useEffect(() => {
+    if (!found || !needsDirectory) return;
+    return onSnapshot(collection(db, "users"), snapshot => {
+      const members = snapshot.docs.filter(record => record.data().archived !== true).map(record => {
+        const data = record.data();
+        return { ...data, id: record.id, ban_id: data.ban_id?.length ? data.ban_id : undefined };
       });
-      setUserProfiles(users);
-    });
+      setProfiles(directoryMembers(members));
+    }, () => setReadError("Chưa tải được hồ sơ thành viên."));
+  }, [found, needsDirectory]);
 
-    return () => {
-      unsubAct();
-      unsubAtt();
-      unsubUsers();
-    };
-  }, [activityId]);
+  useEffect(() => {
+    const element = dialog.current;
+    if (!element) return;
+    if (manualOpen && canCorrect && !element.open) element.showModal();
+    else if ((!manualOpen || !canCorrect) && element.open) element.close();
+  }, [manualOpen, canCorrect]);
 
-  // Map tra cứu thông tin cá nhân nhanh O(1)
-  const usersMap = useMemo(() => {
-    const map = new Map<string, UserProfile>();
-    userProfiles.forEach((u) => {
-      if (u.studentId) map.set(u.studentId.toLowerCase(), u);
-      if (u.id) map.set(u.id.toLowerCase(), u);
-    });
-    return map;
-  }, [userProfiles]);
-
-  // Bộ lọc tìm kiếm
-  const danhSachLoc = useMemo(() => {
-    return attendanceList.filter((item) => {
-      const search = tuKhoa.toLowerCase();
-      const profile = usersMap.get(item.studentId.toLowerCase());
-      return (
-        item.memberName.toLowerCase().includes(search) ||
-        item.studentId.toLowerCase().includes(search) ||
-        (profile?.majorAndClass && profile.majorAndClass.toLowerCase().includes(search))
-      );
-    });
-  }, [attendanceList, tuKhoa, usersMap]);
-
-  // Thêm thành viên thủ công vào hoạt động
-  const xuLyThemThanhVien = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const cleanSid = mssvCanThem.trim().toLowerCase();
-    if (!cleanSid) {
-      alert("Vui lòng nhập Mã số sinh viên hợp lệ");
-      return;
+  const membersById = useMemo(() => {
+    const members = new Map<string, Member>();
+    for (const person of profiles ?? []) {
+      members.set(cleanId(person.id), person);
+      members.set(cleanId(person.studentId), person);
     }
+    return members;
+  }, [profiles]);
 
-    if (attendanceList.some((a) => a.studentId.toLowerCase() === cleanSid)) {
-      alert(`Thành viên có MSSV ${mssvCanThem} đã có trong danh sách hoạt động này`);
-      return;
+  const rows = useMemo(() => {
+    if (!activity) return [];
+    const key = searchKey(search);
+    return (history ?? []).filter(item => !sessionId || sessionId === item.sessionId).map(item => {
+      const member = membersById.get(cleanId(item.memberId)) ?? membersById.get(cleanId(item.studentId));
+      const name = item.memberName || member?.fullName || "Thành viên";
+      const mssv = item.studentId || member?.studentId || "";
+      const session = activity.sessions.find(s => s.id === item.sessionId);
+      const day = attendanceDay(item, activity);
+      const shift = item.sessionName || session?.name || (item.sessionId === "legacy" ? "Buổi gốc" : "Chưa ghi ca");
+      const time = item.timestamp?.toMillis?.() ?? item.createdAt?.toMillis?.();
+      const scannedAt = time === undefined ? "Chưa ghi giờ" : clock.format(time);
+      const scanner = [item.scannerName, item.scannerMssv ? "(" + item.scannerMssv + ")" : ""].filter(Boolean).join(" ") || "Chưa ghi người quét";
+      return { id: item.id, name, mssv, member, day, shift, time, scannedAt, scanner };
+    }).filter(row => !key || searchKey([row.name, row.mssv, row.member?.majorAndClass].join(" ")).includes(key))
+      .sort((a, b) => b.day.localeCompare(a.day) || (b.time ?? 0) - (a.time ?? 0) || a.name.localeCompare(b.name, "vi"));
+  }, [activity, history, membersById, search, sessionId]);
+
+  function openManual() {
+    if (!activity || !canCorrect) return;
+    setRequestedDirectory(true);
+    setStudent("");
+    setManualSession(sessionId || (activity.sessions.length === 1 ? activity.sessions[0].id : ""));
+    setManualError(""); setActionError(""); setNotice(""); setManualOpen(true);
+  }
+
+  const selectedMember = membersById.get(cleanId(student));
+  async function addMember(event: FormEvent) {
+    event.preventDefault();
+    if (mutationLock.current || !canCorrect || !profiles || !history || readError) return;
+    if (!manualSession || !activity?.sessions.some(s => s.id === manualSession)) {
+      setManualError("Chọn ca cần điểm danh."); return;
     }
-
-    const profile = usersMap.get(cleanSid);
-    const tenThanhVien = profile ? profile.fullName : `Thành viên (${mssvCanThem.trim()})`;
-
-    setDangThem(true);
+    if (!selectedMember) { setManualError("Không tìm thấy thành viên có MSSV này."); return; }
+    const alreadyInSession = history.some(item => item.sessionId === manualSession && (
+      cleanId(item.memberId) === cleanId(selectedMember.id) || cleanId(item.studentId) === cleanId(selectedMember.studentId)
+    ));
+    if (alreadyInSession) { setManualError("Thành viên đã được điểm danh trong ca này."); return; }
+    mutationLock.current = true; setSaving(true); setManualError("");
     try {
-      if (!profile) throw new Error("MSSV chưa có trong danh sách thành viên.");
-      const response = await fetch("/api/attendance/manual", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ activityId, memberId: profile.id }),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Không thể thêm điểm danh.");
-      if (result.alreadyCheckedIn) {
-        alert("Thành viên đã được điểm danh trong hoạt động này.");
-        return;
-      }
+      const result = await changeAttendance("POST", { activityId, memberId: selectedMember.id, sessionId: manualSession });
+      if (result.alreadyCheckedIn) { setManualError("Thành viên đã được điểm danh trong ca này."); return; }
+      const shift = activity.sessions.find(s => s.id === manualSession)!;
+      setNotice("Đã điểm danh " + selectedMember.fullName + " · " + shift.name + " · " + displayDay(shift.date) + ".");
+      setSessionId(manualSession); setSearch(""); setManualOpen(false);
+    } catch (err) { setManualError(err instanceof Error ? err.message : "Chưa thêm được lượt điểm danh."); }
+    finally { mutationLock.current = false; setSaving(false); }
+  }
 
-      alert(`Đã thêm thành công thành viên: ${tenThanhVien}`);
-      setMssvCanThem("");
-      setIsModalThem(false);
-    } catch (err: any) {
-      alert("Lỗi khi thêm: " + err.message);
-    } finally {
-      setDangThem(false);
-    }
-  };
-
-  // Xóa thành viên khỏi hoạt động
-  const xuLyXoaThanhVien = async (item: AttendanceItem) => {
-    if (!confirm(`Bạn có chắc chắn muốn xóa thành viên ${item.memberName} (MSSV: ${item.studentId}) khỏi hoạt động này?`)) {
-      return;
-    }
-
+  async function removeRow(row: (typeof rows)[number]) {
+    if (!canCorrect || mutationLock.current || !window.confirm("Xóa lượt điểm danh của " + row.name + " trong ca " + row.shift + " ngày " + displayDay(row.day) + "?")) return;
+    mutationLock.current = true; setSaving(true); setNotice(""); setActionError("");
     try {
-      const response = await fetch("/api/attendance/manual", {
-        method: "DELETE", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ attendanceId: item.id }),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Không thể xóa điểm danh.");
+      await changeAttendance("DELETE", { attendanceId: row.id });
+      setNotice("Đã xóa lượt điểm danh của " + row.name + " trong ca " + row.shift + ".");
+    } catch (err) { setActionError(err instanceof Error ? err.message : "Chưa xóa được lượt điểm danh."); }
+    finally { mutationLock.current = false; setSaving(false); }
+  }
 
-      alert(`Đã xóa thành viên ${item.memberName} khỏi hoạt động`);
-    } catch (err: any) {
-      alert("Lỗi khi xóa: " + err.message);
-    }
-  };
+  async function exportRows() {
+    if (!activity || !rows.length || !profiles || exporting || readError) return;
+    setExporting(true); setActionError("");
+    try {
+      const XLSX = await import("xlsx");
+      const sheet = XLSX.utils.json_to_sheet(rows.map((row, i) => ({
+        STT: i + 1, "Họ và Tên": row.name, MSSV: row.mssv, "Ngành / Lớp": row.member?.majorAndClass || "Chưa cập nhật",
+        "Tổ": row.member?.group || "TNV", "Ban Trực Thuộc": row.member?.department || "Chưa xếp ban",
+        "Mảng Chuyên Môn": row.member?.specialty || "Chưa phân mảng", "Hoạt Động Tham Gia": activity.name,
+        "Điểm Hoạt Động": activity.points, "Ngày tham gia": row.day, "Buổi": row.shift,
+        "Thời Gian Điểm Danh": row.scannedAt, "Người Trực Quét": row.scanner,
+      })));
+      sheet["!cols"] = [6,25,15,28,8,18,20,32,16,18,14,24,26].map(wch => ({ wch }));
+      const book = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(book, sheet, "DiemDanhHoatDong");
+      XLSX.writeFile(book, "DanhSach_DiemDanh_" + searchKey(activity.name).replace(/[^a-z0-9]+/g, "_") + "_" + Date.now() + ".xlsx");
+    } catch { setActionError("Chưa xuất được Excel. Vui lòng thử lại."); }
+    finally { setExporting(false); }
+  }
 
-  // Xuất file Excel danh sách toàn bộ hoạt động (Đầy đủ Ngành/Lớp, Tổ 1, 2, 3...)
-  const xuatFileExcelHoatDong = async () => {
-    if (attendanceList.length === 0) {
-      alert("Chưa có thành viên nào điểm danh hoạt động này!");
-      return;
-    }
+  if (readError) return <div className={styles.error} role="alert">{readError} <button onClick={retry}>Thử lại</button></div>;
+  if (activity === undefined) return <p className={styles.empty} role="status">Đang tải hoạt động…</p>;
+  if (!activity) return <div className={styles.empty}><h1>Không tìm thấy hoạt động</h1><Link className={layout.textButton} href={activityManagementPath}>Về danh sách hoạt động</Link></div>;
 
-    const XLSX = await import("xlsx").catch(() => null);
-    if (!XLSX) { alert("Không tải được công cụ xuất Excel. Vui lòng thử lại."); return; }
-    const dataExport = attendanceList.map((item, idx) => {
-      const profile = usersMap.get(item.studentId.toLowerCase());
-      return {
-        STT: idx + 1,
-        "Họ và Tên": item.memberName || profile?.fullName,
-        MSSV: item.studentId,
-        "Ngành / Lớp": profile?.majorAndClass || "Chưa cập nhật",
-        "Tổ": formatGroupNumber(profile?.group),
-        "Ban Trực Thuộc": profile?.department || "Chưa xếp ban",
-        "Mảng Chuyên Môn": profile?.specialty || "Chưa phân mảng",
-        "Hoạt Động Tham Gia": activity?.name || "Hoạt động",
-        "Điểm Hoạt Động": activity?.points || 10,
-        "Thời Gian Điểm Danh": item.timestamp?.seconds
-          ? new Date(item.timestamp.seconds * 1000).toLocaleString("vi-VN")
-          : "Vừa xong",
-        "Người Trực Quét": `${item.scannerName || "Ban cán sự"} ${item.scannerMssv ? `(${item.scannerMssv})` : ""}`.trim(),
-      };
-    });
-
-    const worksheet = XLSX.utils.json_to_sheet(dataExport);
-
-    // Căn chỉnh độ rộng từng cột chuẩn xác
-    worksheet["!cols"] = [
-      { wch: 6 },  // STT
-      { wch: 25 }, // Họ và Tên
-      { wch: 15 }, // MSSV
-      { wch: 28 }, // Ngành / Lớp
-      { wch: 8 },  // Tổ
-      { wch: 18 }, // Ban Trực Thuộc
-      { wch: 20 }, // Mảng Chuyên Môn
-      { wch: 32 }, // Hoạt Động Tham Gia
-      { wch: 16 }, // Điểm Hoạt Động
-      { wch: 24 }, // Thời Gian Điểm Danh
-      { wch: 26 }, // Người Trực Quét
-    ];
-
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "DiemDanhHoatDong");
-    XLSX.writeFile(
-      workbook,
-      `DanhSach_DiemDanh_${(activity?.name || "HoatDong").replace(/[^a-zA-Z0-9]/g, "_")}_${Date.now()}.xlsx`
-    );
-  };
-
-  return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-800 pb-28 select-none">
-      {/* HEADER */}
-      <header className="bg-white border-b border-slate-200 px-6 py-4 shadow-xs sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <Link
-                href="/admin/diem-danh/hoat-dong"
-                className="text-xs font-bold text-slate-500 hover:text-slate-900"
-              >
-                Danh sách hoạt động
-              </Link>
-              <span className="text-slate-300">/</span>
-              <span className="text-xs font-bold text-[#0284c7]">Chi tiết hoạt động</span>
-            </div>
-            <h1 className="text-xl font-black text-slate-900 tracking-tight uppercase">
-              {activity?.name || "Đang tải dữ liệu hoạt động..."}
-            </h1>
-            <p className="text-xs text-slate-500 font-medium mt-0.5">
-              Ngày diễn ra: {activity?.date || "—"} • điểm hoạt động: +{activity?.points || 10} • Mật mã trực: {activity?.password || "123"}
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              type="button"
-              onClick={() => setIsModalThem(true)}
-              className="px-4 py-2 rounded-xl bg-sky-50 hover:bg-sky-100 text-[#0284c7] border border-sky-200 font-bold text-xs transition cursor-pointer"
-            >
-              + Thêm Thành Viên
-            </button>
-
-            <button
-              type="button"
-              onClick={xuatFileExcelHoatDong}
-              className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-dark font-bold text-xs transition cursor-pointer shadow-xs"
-            >
-              Xuất File Hoạt Động ({attendanceList.length})
-            </button>
-
-            <Link
-              href="/admin/diem-danh/hoat-dong"
-              className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition cursor-pointer border border-slate-200"
-            >
-              Quay lại
-            </Link>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 mt-6 space-y-4">
-        <BulkAttendance activityId={activityId} />
-        {/* THANH TÌM KIẾM ĐƯỢC THIẾT KẾ LẠI: CÂN ĐỐI, RÕ RÀNG, KHÔNG BỊ CẮT VIỀN */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-3 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="w-full sm:flex-1">
-            <input
-              type="text"
-              placeholder="Tìm kiếm theo Mã số sinh viên, Họ và tên hoặc Ngành học..."
-              value={tuKhoa}
-              onChange={(e) => setTuKhoa(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-800 placeholder-slate-400 font-medium outline-none focus:bg-white focus:border-[#0284c7] transition"
-            />
-          </div>
-
-          <div className="shrink-0">
-            <span className="inline-block text-xs font-bold text-sky-800 bg-sky-50 border border-sky-200 px-3.5 py-2 rounded-xl">
-              Tổng số: {danhSachLoc.length} / {attendanceList.length} thành viên
-            </span>
-          </div>
-        </div>
-
-        {/* BẢNG DANH SÁCH THÀNH VIÊN ĐÃ ĐIỂM DANH */}
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse whitespace-nowrap">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                  <th className="px-5 py-3.5 text-center w-12">#</th>
-                  <th className="px-5 py-3.5">Họ và Tên</th>
-                  <th className="px-5 py-3.5">MSSV</th>
-                  <th className="px-5 py-3.5">Ngành / Lớp</th>
-                  <th className="px-5 py-3.5 text-center w-16">Tổ</th>
-                  <th className="px-5 py-3.5">Ban / Mảng</th>
-                  <th className="px-5 py-3.5">Thời Gian Quét</th>
-                  <th className="px-5 py-3.5">Người Trực Điểm Danh</th>
-                  <th className="px-5 py-3.5 text-right w-24">Thao Tác</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                {loading ? (
-                  <tr>
-                    <td colSpan={9} className="text-center py-16 text-slate-400">
-                      Đang nạp dữ liệu danh sách điểm danh...
-                    </td>
-                  </tr>
-                ) : danhSachLoc.length === 0 ? (
-                  <tr>
-                    <td colSpan={9} className="text-center py-16 text-slate-400">
-                      Không tìm thấy dữ liệu điểm danh phù hợp
-                    </td>
-                  </tr>
-                ) : (
-                  danhSachLoc.map((item, idx) => {
-                    const profile = usersMap.get(item.studentId.toLowerCase());
-                    const toHienThi = formatGroupNumber(profile?.group);
-
-                    return (
-                      <tr key={item.id} className="hover:bg-slate-50/80 transition">
-                        <td className="px-5 py-3.5 text-center font-mono text-slate-400">{idx + 1}</td>
-                        <td className="px-5 py-3.5 font-bold text-slate-900">{item.memberName || profile?.fullName}</td>
-                        <td className="px-5 py-3.5 font-mono font-bold text-sky-700">{item.studentId}</td>
-                        
-                        {/* CỘT NGÀNH / LỚP MỚI BỔ SUNG */}
-                        <td className="px-5 py-3.5 text-slate-600 font-medium">
-                          {profile?.majorAndClass || "Chưa cập nhật"}
-                        </td>
-
-                        {/* CỘT TỔ ĐƯỢC CHUẨN HÓA SỐ */}
-                        <td className="px-5 py-3.5 text-center">
-                          <span className="inline-block px-2.5 py-0.5 rounded font-mono font-bold text-xs bg-slate-100 text-slate-700 border border-slate-200">
-                            {toHienThi}
-                          </span>
-                        </td>
-
-                        {/* CỘT BAN / MẢNG */}
-                        <td className="px-5 py-3.5">
-                          <span className="bg-slate-100 px-2.5 py-0.5 rounded text-[11px] font-semibold border border-slate-200/60 text-slate-700">
-                            {profile?.department || "Chưa xếp ban"} • {profile?.specialty || "Chưa phân mảng"}
-                          </span>
-                        </td>
-
-                        <td className="px-5 py-3.5 text-slate-500 font-medium">
-                          {item.timestamp?.seconds
-                            ? new Date(item.timestamp.seconds * 1000).toLocaleString("vi-VN")
-                            : "Vừa xong"}
-                        </td>
-
-                        <td className="px-5 py-3.5">
-                          <span className="font-bold text-slate-800">{item.scannerName}</span>
-                          {item.scannerMssv && (
-                            <span className="text-[10px] text-slate-400 block font-mono">
-                              ({item.scannerMssv})
-                            </span>
-                          )}
-                        </td>
-
-                        <td className="px-5 py-3.5 text-right">
-                          <button
-                            type="button"
-                            onClick={() => xuLyXoaThanhVien(item)}
-                            className="px-3 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-bold text-[11px] transition cursor-pointer"
-                          >
-                            Xóa
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </main>
-
-      {/* MODAL THÊM THÀNH VIÊN VÀO HOẠT ĐỘNG */}
-      {isModalThem && (
-        <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-md p-6 rounded-3xl border border-slate-200 shadow-2xl">
-            <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-100">
-              <div>
-                <h3 className="text-sm font-bold uppercase text-slate-900">
-                  Thêm Thành Viên Vào Hoạt Động
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Ghi nhận điểm danh bổ sung cho hoạt động này
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsModalThem(false)}
-                className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs cursor-pointer"
-              >
-                Đóng
-              </button>
-            </div>
-
-            <form onSubmit={xuLyThemThanhVien} className="space-y-4 text-xs">
-              <div>
-                <label className="block font-bold text-slate-700 mb-1.5 uppercase text-[11px]">
-                  Mã Số Sinh Viên (MSSV) *
-                </label>
-                <input
-                  type="text"
-                  required
-                  autoFocus
-                  value={mssvCanThem}
-                  onChange={(e) => setMssvCanThem(e.target.value)}
-                  placeholder="Ví dụ: 4751180032"
-                  className="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-xl font-mono font-bold text-xs outline-none focus:bg-white focus:border-[#0284c7]"
-                />
-                {mssvCanThem.trim() && usersMap.has(mssvCanThem.trim().toLowerCase()) && (
-                  <div className="mt-2 p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-[11px] space-y-0.5">
-                    <p className="font-bold">
-                      Họ tên: {usersMap.get(mssvCanThem.trim().toLowerCase())?.fullName}
-                    </p>
-                    <p className="text-emerald-700">
-                      Ngành: {usersMap.get(mssvCanThem.trim().toLowerCase())?.majorAndClass}
-                    </p>
-                    <p className="text-emerald-700">
-                      Đơn vị: Tổ {formatGroupNumber(usersMap.get(mssvCanThem.trim().toLowerCase())?.group)} - Ban {usersMap.get(mssvCanThem.trim().toLowerCase())?.department}
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              <div className="pt-2 flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsModalThem(false)}
-                  className="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold transition cursor-pointer"
-                >
-                  Hủy Bỏ
-                </button>
-                <button
-                  type="submit"
-                  disabled={dangThem}
-                  className="flex-1 py-2.5 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] text-white font-bold transition uppercase cursor-pointer disabled:opacity-60"
-                >
-                  {dangThem ? "Đang ghi nhận..." : "Xác Nhận Thêm"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+  const canScan = activity.isActive && !activity.archived;
+  return <div>
+    <header className={layout.pageHeader}>
+      <div>
+        <h1>{activity.name}</h1>
+        <p>{displayDay(activity.date)} · {activity.points} điểm/buổi · {activity.password ? "Mật mã trực " + activity.password : "Không yêu cầu mật mã"}</p>
+      </div>
+      <div className={detail.actions}>
+        {canCorrect && <button type="button" className={styles.primary} disabled={saving || !history} onClick={openManual}>Thêm thành viên</button>}
+        <Link className={styles.secondary} href={{ pathname: attendanceReviewPath, query: { activityId, name: activity.name } }}>Duyệt điểm danh</Link>
+        <button type="button" className={styles.secondary} disabled={!rows.length || !profiles || exporting} onClick={exportRows}>
+          {exporting ? "Đang xuất Excel…" : "Xuất danh sách đã lọc (" + rows.length + ")"}
+        </button>
+      </div>
+    </header>
+    {activity.archived ? <p className={detail.gate}>Hoạt động đã lưu trữ.</p>
+      : !canScan && <p className={detail.gate}>Cổng quét đã khóa. Quản trị viên vẫn có thể điểm danh bù theo ca.</p>}
+    <div className={detail.filters}>
+      <ActivitySessions activityId={activityId} value={sessionId} onChange={setSessionId}
+        providedSessions={activity.sessions} allowCreate={canScan} emptyLabel="Tất cả các ca" autoSelect={false} />
+      {canScan && <BulkAttendance activityId={activityId} providedSessions={activity.sessions} />}
     </div>
-  );
+    {notice && <p className={styles.notice} role="status">{notice}</p>}
+    {actionError && <p className={styles.error} role="alert">{actionError}</p>}
+
+    <section className={detail.history} aria-labelledby="activity-history">
+      <div className={styles.listHeading}>
+        <h2 id="activity-history">Lịch sử điểm danh</h2>
+        {history && <p role="status">{rows.length === history.length ? history.length + " lượt" : rows.length + " / " + history.length + " lượt"}</p>}
+      </div>
+      <label className={styles.search}>
+        <WorkspaceIcon name="search" />
+        <input type="search" aria-label="Tìm lượt điểm danh" placeholder="Tìm tên, MSSV hoặc ngành học" value={search} onChange={e => setSearch(e.target.value)} />
+      </label>
+      {history === null ? <p className={styles.empty} role="status">Đang tải lượt điểm danh…</p>
+        : !history.length ? <p className={styles.empty}>Hoạt động chưa có lượt điểm danh.</p>
+        : !rows.length ? <div className={styles.empty}>Không có lượt nào khớp với bộ lọc.
+          <button type="button" onClick={() => { setSearch(""); setSessionId(""); }}>Xóa bộ lọc</button></div>
+        : <ul className={detail.entries} aria-label="Các lượt điểm danh">{rows.map(row => <li key={row.id}>
+          <details>
+            <summary>
+              <span className={detail.identity}><strong>{row.name}</strong><small>{row.mssv || "Chưa ghi MSSV"}</small></span>
+              <span className={detail.shift}><strong>{row.shift}</strong><small>{displayDay(row.day)}</small></span>
+              <span className={detail.chevron} aria-hidden="true">›</span>
+            </summary>
+            <div className={detail.expanded}>
+              <dl>
+                <div><dt>Ngành / lớp</dt><dd>{row.member?.majorAndClass || "Chưa cập nhật"}</dd></div>
+                <div><dt>Tổ</dt><dd>{row.member?.group || "TNV"}</dd></div>
+                <div><dt>Ban / mảng</dt><dd>{row.member?.department || "Chưa xếp ban"} · {row.member?.specialty || "Chưa phân mảng"}</dd></div>
+                <div><dt>Giờ điểm danh</dt><dd>{row.scannedAt}</dd></div>
+                <div><dt>Người trực</dt><dd>{row.scanner}</dd></div>
+              </dl>
+              {canCorrect && <button type="button" className={detail.remove} disabled={saving} onClick={() => removeRow(row)}>Xóa lượt</button>}
+            </div>
+          </details>
+        </li>)}</ul>}
+    </section>
+
+    <dialog ref={dialog} className={styles.editor} aria-labelledby="activity-manual-title"
+      onCancel={e => { if (mutationLock.current) e.preventDefault(); }}
+      onClose={e => { if (!e.currentTarget.open) setManualOpen(false); }}>
+      <div className={styles.dialogBody}>
+        <div className={styles.dialogHeading}>
+          <h2 id="activity-manual-title">Thêm thành viên điểm danh</h2>
+          <button type="button" aria-label="Đóng" disabled={saving} onClick={() => setManualOpen(false)}><WorkspaceIcon name="close" /></button>
+        </div>
+        <form onSubmit={addMember}>
+          <fieldset className={styles.fields} disabled={saving}>
+            <label className={styles.fullField}>Ca cần điểm danh
+              <select aria-label="Ca cần điểm danh" required value={manualSession} onChange={e => { setManualSession(e.target.value); setManualError(""); }}>
+                <option value="">Chọn ca</option>
+                {activity.sessions.map(s => <option key={s.id} value={s.id}>{displayDay(s.date)} · {s.name}</option>)}
+              </select>
+            </label>
+            <label className={styles.fullField}>Mã số sinh viên
+              <input type="text" required autoComplete="off" value={student} onChange={e => { setStudent(e.target.value); setManualError(""); }} />
+            </label>
+          </fieldset>
+          {manualOpen && !profiles && <p role="status" className={styles.empty}>Đang tải hồ sơ thành viên…</p>}
+          {selectedMember && <p className={detail.candidate}><strong>{selectedMember.fullName}</strong><br />
+            {selectedMember.majorAndClass} · {selectedMember.group === "TNV" ? "TNV" : "Tổ " + selectedMember.group} · {selectedMember.department || "Chưa xếp ban"}</p>}
+          {manualError && <p className={styles.error} role="alert">{manualError}</p>}
+          <div className={styles.dialogActions}>
+            <button type="button" className={styles.secondary} disabled={saving} onClick={() => setManualOpen(false)}>Hủy</button>
+            <button type="submit" className={styles.primary} disabled={saving || !profiles || !canCorrect}>{saving ? "Đang lưu…" : "Xác nhận điểm danh"}</button>
+          </div>
+        </form>
+      </div>
+    </dialog>
+  </div>;
 }

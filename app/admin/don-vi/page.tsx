@@ -56,7 +56,7 @@ export default function AdminDonViMenu() {
     },
     {
       title: 'CẤP GIẤY CHỨNG NHẬN HOẠT ĐỘNG',
-      desc: 'Cấp giấy chứng nhận tham gia chiến dịch tình nguyện, quản lý danh sách phôi chứng nhận, xuất tệp và tra cứu xác thực trực tuyến.',
+      desc: 'Quản lý thư mục giấy chứng nhận theo hoạt động và tra cứu theo mã số sinh viên.',
       href: '/admin/don-vi/cap-gcn',
       tag: 'CẤP GIẤY CHỨNG NHẬN',
       iconBorder: 'border-sky-200 text-[#0284c7] bg-sky-50',
@@ -76,10 +76,10 @@ export default function AdminDonViMenu() {
       <div className="bg-white border border-slate-200 rounded-3xl p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight uppercase">
-            Quản Lý Cơ Cấu Đơn Vị
+            Công cụ đơn vị
           </h1>
           <p className="text-xs text-slate-500 font-medium mt-1">
-            Chọn chức năng nghiệp vụ quản trị bạn muốn thao tác thực hiện
+            Bài viết, bản đồ, đăng ký thành viên và giấy chứng nhận
           </p>
         </div>
 

@@ -2,11 +2,11 @@ const {test}=require('node:test');const assert=require('node:assert/strict');
 const {load}=require('./helpers.cjs');const {initializeApp,deleteApp}=require('firebase-admin/app');const {getFirestore,FieldValue,Timestamp}=require('firebase-admin/firestore');const {randomUUID}=require('node:crypto');
 test('real Firestore batches, work counts, reports, transfer and append-only history',{timeout:90000},async()=>{
  assert.ok(process.env.FIRESTORE_EMULATOR_HOST,'Emulator required');
- const app=initializeApp({projectId:'demo-webdtntn'},'management-'+Date.now()),db=getFirestore(app),id=randomUUID();
+ const app=initializeApp({projectId:'demo-webdtntn-tests'},'management-'+Date.now()),db=getFirestore(app),id=randomUUID();
  const actor=db.collection('admin_accounts').doc(id),sessionRef=db.collection('web_sessions').doc(id),member=db.collection('users').doc(id),activity=db.collection('activities').doc(id);
  await actor.set({role:'Tổ trưởng',to_id:'Tổ 1',authVersion:'v1'});await sessionRef.set({expiresAt:Timestamp.fromMillis(Date.now()+90000)});await member.set({mssv:id,name:'Test member',to_id:'to_1',ban_id:['bansukien'],accessGroup:'1',accessDepartment:'su-kien',soBuoiDiemDanh:0});await activity.set({name:'Test activity',isActive:true});
  const session={user:{role:'Tổ trưởng',name:'Test leader',mssv:id},accountRef:actor,sessionRef,authVersion:'v1'};
- const mocks={'server-only':{},'firebase-admin/firestore':{FieldValue},'@/lib/firebase-admin':{adminDb:()=>db},'@/lib/server-session':{readSession:async()=>session},'@/lib/member-scope':load('lib/member-scope.ts'),'@/lib/permissions':load('lib/permissions.ts')};
+ const mocks={'server-only':{},'firebase-admin/firestore':{FieldValue},'@/lib/firebase-admin':{adminDb:()=>db},'@/lib/server-session':{readSessionClaims: async () => null, readSession:async()=>session},'@/lib/member-scope':load('lib/member-scope.ts'),'@/lib/permissions':load('lib/permissions.ts')};
  const attendance=load('lib/attendance-service.ts',mocks),transfer=load('lib/member-transfer.ts',{...mocks,'@/lib/attendance-service':attendance});
  const {GET}=load('app/api/management/route.ts',{...mocks,'next/server':{NextResponse:Response},'@/lib/attendance-service':attendance,'@/lib/approval-batches':load('lib/approval-batches.ts'),'@/lib/monthly-report':load('lib/monthly-report.ts')});
  const read=async query=>{const r=await GET(new Request('http://localhost/api/management'+query));const d=await r.json();assert.equal(r.status,200,JSON.stringify(d));return d;};
@@ -25,5 +25,17 @@ test('real Firestore batches, work counts, reports, transfer and append-only his
   const prev=await read('?mode=report&month=2026-09');assert.equal(prev.entries.filter(e=>e.memberId===id).length,0);
   const logs=await read('?mode=history');assert.equal(logs.rows.filter(r=>r.memberId===id&&r.action==='member.transfer.approve').length,1);
   assert.equal(logs.rows.filter(r=>r.memberId===id&&r.action==='attendance.request').length,1);
+  const dept=db.collection('activities').doc(id+'-dept');
+  await dept.set({name:'Department event',flow:'department',accessDepartment:'su-kien',isActive:true,sessions:[{id:'day1',date:'2026-10-23',name:'Sáng'},{id:'day2',date:'2026-10-24',name:'Sáng'}]});
+  session.user.role='Trưởng ban Truyền thông';await actor.update({role:session.user.role});
+  for(const sessionId of ['day1','day2'])await attendance.recordAttendance({memberId:id,activityId:dept.id,sessionId,flow:'department',batchId:'same-batch'},false,false,true);
+  const deptRequests=(await db.collection('attendance_requests').where('activityId','==',dept.id).get()).docs;assert.equal(deptRequests.length,2);
+  session.user.role='Quản trị viên';await actor.update({role:session.user.role});
+  for(const req of deptRequests)await Promise.all([1,2].map(()=>attendance.reviewAttendanceRequest({id:req.id,action:'approve'})));
+  const deptRecords=await db.collection('department_tasks').where('activityId','==',dept.id).get();assert.equal(deptRecords.size,2);
+  assert.ok(deptRecords.docs.every(d=>d.data().accessDepartment==='su-kien'&&d.data().sessionDate));
+  assert.equal((await db.collection('attendance').where('activityId','==',dept.id).get()).size,0);
+  assert.equal((await member.get()).data().departmentSessions,2);
+  assert.equal((await member.get()).data().groupSessions,1);
  }finally{await deleteApp(app);}
 });

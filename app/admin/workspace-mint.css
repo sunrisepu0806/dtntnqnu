@@ -1,0 +1,112 @@
+.design-v2 .mint-workspace {
+  --v2-ink: #173b36;
+  --v2-muted: #506960;
+  --v2-primary: #12664f;
+  --v2-canvas: #f4faf7;
+  --v2-line: #d6e5dd;
+  --qnu-light: #eaf7f0;
+  --qnu-header: linear-gradient(115deg, #e2f8eb, #d1f1e1 68%, #e6f6d8);
+  --workspace-wash: linear-gradient(125deg, #eaf8f2, #f8fbfa 42%, #f0f6fc);
+  --qnu-shadow: 0 2px 7px #193c5510;
+  --color-sky-50: #eff9f4;
+  --color-sky-100: #ddf1e6;
+  --color-sky-200: #c2dfce;
+  --color-sky-600: var(--v2-primary);
+  --color-sky-700: #105b47;
+  --color-sky-800: #174f40;
+  --color-blue-600: var(--v2-primary);
+  --color-blue-700: #105b47;
+  --color-slate-50: var(--v2-canvas);
+  --color-slate-200: var(--v2-line);
+  --color-slate-600: var(--v2-muted);
+  --color-slate-800: var(--v2-ink);
+  --color-slate-900: var(--v2-ink);
+  color: var(--v2-ink);
+}
+.design-v2 .qnu-theme .mint-workspace .admin-content { background: var(--workspace-wash); min-width: 0; }
+.mint-workspace .v2-topbar { background: white; border-bottom: 1px solid var(--v2-line); border-radius: 0; }
+.qnu-theme .mint-workspace .v2-topbar :is(.v2-topbar-left strong, .v2-topbar-account strong) { color: var(--v2-ink); }
+.qnu-theme .mint-workspace .v2-topbar :is(.v2-topbar-eyebrow, .v2-topbar-account small) { color: var(--v2-muted); }
+.qnu-theme .mint-workspace .v2-topbar :is(.v2-avatar, .v2-menu-button, .v2-topbar-account button) {
+  color: #175b47; background: #edf8f2; border-color: #cce3d6;
+}
+.mint-workspace :is(.v2-sidebar,.v2-mobile-menu) a[aria-current=page] .v2-nav-icon { color: var(--v2-primary); }
+.mint-workspace .workspace-placeholder { display: grid; gap: 12px; animation: show-workspace-placeholder .12s .15s both; }
+.mint-workspace .workspace-placeholder span { display: block; width: min(100%, 720px); height: 14px; background: #e1ede6; border-radius: 6px; }
+.mint-workspace .workspace-placeholder span:first-child { width: min(50%, 240px); height: 24px; }
+.mint-workspace .workspace-placeholder span:last-child { width: min(75%, 480px); }
+@keyframes show-workspace-placeholder { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .mint-workspace .workspace-placeholder { animation: none; } }
+
+@media (min-width: 1100px) {
+  .design-v2 .qnu-theme .mint-workspace.admin-shell { grid-template-columns: 212px minmax(0,1fr); }
+  .qnu-theme .mint-workspace .v2-sidebar { overflow: hidden; padding: 17px 11px 11px; }
+  .mint-workspace .v2-brand { flex-shrink: 0; gap: 9px; padding: 2px 7px 16px; }
+  .mint-workspace .v2-brand img { width: 34px; height: 34px; }
+  .mint-workspace .v2-brand strong { font-size: 15px; }
+  .mint-workspace .v2-brand small { font-size: 12px; margin-top: 2px; }
+  .qnu-theme .mint-workspace .v2-sidebar nav {
+    align-content: start; gap: 2px; min-height: 0; overflow-y: auto; scrollbar-width: thin;
+  }
+  .qnu-theme .mint-workspace .v2-sidebar nav a {
+    min-height: 38px; padding: 7px 10px; gap: 9px; font-size: 13px; line-height: 1.35; border-radius: 9px;
+  }
+  .qnu-theme .mint-workspace .v2-sidebar nav a:hover { color: #22483e; background: #f2f5f3; }
+  .qnu-theme .mint-workspace .v2-sidebar nav a[aria-current=page] { background: #dff1e7; color: #13543e; }
+  .mint-workspace .v2-sidebar .v2-nav-icon svg { width: 17px; height: 17px; }
+  .mint-workspace .v2-sidebar-profile { flex-shrink: 0; margin-top: auto; padding: 12px 6px 5px; }
+  .mint-workspace .v2-sidebar-profile small { margin-top: 1px; }
+  .qnu-theme .mint-workspace .v2-logout { flex-shrink: 0; min-height: 32px; padding: 4px 6px; background: white; color: var(--v2-muted); }
+}
+@media (pointer: coarse) and (min-width: 1100px) {
+  .qnu-theme .mint-workspace .v2-sidebar nav a, .qnu-theme .mint-workspace .v2-logout { min-height: 44px; }
+}
+.design-v2 .mint-workspace .admin-test-banner { background: #fff6e6; color: #735219; font-size: 12px; }
+.design-v2 .mint-workspace .admin-content :is(.workspace-tabs,.compact-segments,.attendance-methods,.attendance-filters) { background: #e8f2ed; }
+.design-v2 .mint-workspace .admin-content :is(.workspace-tabs,.attendance-methods,.attendance-filters,.compact-segments) > button[aria-pressed=true] {
+  background: white; color: var(--v2-primary); box-shadow: 0 1px 4px #193c5520;
+}
+.design-v2 .mint-workspace .admin-content :is(input,select,textarea) { accent-color: var(--v2-primary); }
+.design-v2 .mint-workspace :is(a,button,input,select,summary,textarea):focus-visible { outline: 3px solid #299172; outline-offset: 2px; }
+.design-v2 .mint-workspace .admin-content :is(.attendance-secondary,.approval-refresh,.attendance-option-action,.desk-more > summary) { color: var(--v2-primary); }
+.design-v2 .mint-workspace .admin-content :is(.attendance-start-grid,.attendance-capture-layout) > section,
+.design-v2 .mint-workspace .admin-content :is(.task-disclosure,.approval-filter-bar,.unified-filter-bar,fieldset.bg-white,.bg-white.border.rounded-xl) {
+  border-color: var(--v2-line); border-radius: 18px; box-shadow: var(--qnu-shadow);
+}
+.design-v2 .mint-workspace .admin-content :is(.desk-toolbar,.attendance-start-heading,.attendance-hero) {
+  border-color: var(--v2-line);
+}
+.design-v2 .qnu-theme .mint-workspace .admin-content > .bg-slate-50 { background-color: transparent; }
+.design-v2 .qnu-theme .mint-workspace .admin-content :is(
+  .desk-toolbar, .attendance-start-heading, .scanner-heading,
+  .accounts-page > div:has(> div > h1),
+  header.bg-white:has(h1), div.bg-white.rounded-3xl:has(> div > h1)
+) {
+  padding: 13px 16px; border: 1px solid #cce1d5; border-radius: 16px;
+  background: linear-gradient(115deg,#e8f7ee,#f7fbf7);
+}
+.design-v2 .mint-workspace .admin-content .ledger-flow-options > button[aria-pressed=true],
+.design-v2 .mint-workspace .admin-content .scanner-selection {
+  background: var(--qnu-light); border-color: #badbcb; color: #205746;
+}
+.mint-workspace .attendance-steps li[aria-current=step] span { background: var(--v2-primary); color: white; }
+.design-v2 .mint-workspace .admin-content :is(a,button):is(.bg-\[\#0284c7\],.bg-\[\#0369a1\],.bg-\[\#025a77\]) {
+  background-color: var(--v2-primary); color: white;
+}
+.mint-workspace .export-workspace fieldset > label { padding-inline: 8px; border-radius: 8px; }
+.mint-workspace .export-workspace fieldset > label:hover { background: var(--qnu-light); }
+.mint-workspace .export-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 16px; }
+.mint-workspace .export-actions a { display: inline-flex; align-items: center; min-height: 44px; color: var(--v2-primary); }
+.design-v2 .mint-workspace .admin-content .attendance-choice-panel:target,
+.design-v2 .mint-workspace .admin-content .attendance-session-bar {
+  border-color: #badbcb; background: #f2faf5;
+}
+.design-v2 .mint-workspace .admin-content :is(.approval-filter-bar,.approval-batch-summary) { background: #fff8ed; }
+.design-v2 .mint-workspace .admin-content :is(.desk-more > summary,.member-search-row > button,.attendance-shortcuts a:not(:first-child)) {
+  background: white; color: var(--v2-primary); border-color: var(--v2-line);
+}
+.design-v2 .mint-workspace .admin-content .pilot-workspace > header,
+.design-v2 .mint-workspace .admin-content .pilot-workspace header h1 { color: var(--v2-ink); }
+@media (max-width: 767px) {
+  .design-v2 .qnu-theme .mint-workspace .admin-content :is(.desk-toolbar,.attendance-start-heading,.scanner-heading) { padding: 8px 10px; border-radius: 12px; }
+}

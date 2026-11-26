@@ -1,66 +1,254 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { approvalBatches } from "@/lib/approval-batches";
-type Row = { batchId?:string; createdBy?:string; activityId?:string; accessGroup?:string; accessDepartment?:string; id: string; memberName: string; studentId: string; kind: string; activityName: string; taskName: string; workDescription: string; productLink: string; points: number; submittedBy: string; status: string; reason?: string; reviewedBy?: string; time: number };
-export default function AttendanceApprovals() {
-  const [rows,setRows]=useState<Row[]>([]);
-  const [admin,setAdmin]=useState(false);
-  const [status,setStatus]=useState("pending");
-  const [error,setError]=useState("");
-  const [busy,setBusy]=useState(false);
-  const [loading,setLoading]=useState(true);
-  const [selected,setSelected]=useState<string[]>([]);
-  const [notice,setNotice]=useState("");
-  const [rejectIds,setRejectIds]=useState<string[]>([]);
-  const [rejectReason,setRejectReason]=useState("");
-  const lock=useRef(false);
-  const activeRequest=useRef<AbortController | null>(null);
-  const refresh=useCallback(async(signal?:AbortSignal)=>{
-    if(signal?.aborted)return;
+import { searchKey } from "@/lib/search-text";
+import type { AttendanceFlow } from "@/lib/activity-model";
+import { WorkspaceIcon } from "./workspace-navigation";
+import styles from "./approval-inbox.module.css";
+
+type Row = {
+  id: string; kind: string; flow?: string; batchId?: string; createdBy?: string; activityId?: string; sessionId?: string;
+  memberName: string; studentId: string; accessGroup?: string; activityName?: string; sessionName?: string;
+  sessionDate?: string; activityDepartment?: string; taskName?: string; workDescription?: string; productLink?: string;
+  submittedBy?: string; points: number; time: number; reviewedBy?: string; reason?: string;
+};
+const statuses = { pending: "Chờ duyệt", approved: "Đã duyệt", rejected: "Từ chối" } as const;
+type Status = keyof typeof statuses;
+const pageSizes = [50, 100, 500];
+const refreshInterval = 90_000;
+const timeFormat = new Intl.DateTimeFormat("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", dateStyle: "short", timeStyle: "short" });
+
+export default function AttendanceApprovals({ initialFlow = "group", activityId }: { initialFlow?: AttendanceFlow; activityId?: string }) {
+  const [flow, setFlow] = useState<AttendanceFlow>(initialFlow);
+  const [status, setStatus] = useState<Status>("pending");
+  const [search, setSearch] = useState("");
+  const [pageSize, setPageSize] = useState(pageSizes[0]);
+  const [pages, setPages] = useState([""]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const cursor = pages[pages.length - 1];
+  const [rows, setRows] = useState<Row[]>([]);
+  const [admin, setAdmin] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [selected, setSelected] = useState<string[]>([]);
+  const [expanded, setExpanded] = useState<string[]>([]);
+  const [rejectIds, setRejectIds] = useState<string[]>([]);
+  const [reason, setReason] = useState("");
+  const lock = useRef(false);
+  const inbox = useRef<HTMLElement>(null);
+  const rejection = useRef<HTMLDialogElement>(null);
+  const activeRequest = useRef<AbortController | null>(null);
+  const loadedAt = useRef(0);
+
+  const refresh = useCallback(async () => {
     activeRequest.current?.abort();
-    const controller=new AbortController();
-    activeRequest.current=controller;
-    const abort=()=>controller.abort();
-    signal?.addEventListener("abort",abort,{once:true});
-    const timeout=setTimeout(abort,20000);
+    const controller = new AbortController();
+    activeRequest.current = controller;
+    const timeout = setTimeout(() => controller.abort(), 20000);
     try {
-      const response=await fetch(`/api/attendance/requests?status=${status}`,{signal:controller.signal});const data=await response.json();
-      if(!response.ok)throw Error(data.error);
-      if(controller.signal.aborted)return;
-      setRows(old=>JSON.stringify(old)===JSON.stringify(data.rows)?old:data.rows);setAdmin(data.admin);setError(data.capped ? "Đang hiển thị tối đa 500 đề nghị." : "");
-      setSelected(old=>old.filter(id=>data.rows.some((row:Row)=>row.id===id)));
-    }catch(e){if(!signal?.aborted && activeRequest.current===controller)setError(e instanceof Error?e.message:"Không tải được đề nghị.");}
-    finally{clearTimeout(timeout);signal?.removeEventListener("abort",abort);if(!signal?.aborted && activeRequest.current===controller){activeRequest.current=null;setLoading(false);}}
-  },[status]);
-  useEffect(()=>{
-    const controller=new AbortController();setLoading(true);setSelected([]);setRejectIds([]);
-    const load=()=>{if(!document.hidden && !lock.current)void refresh(controller.signal);};
-    load();
+      const filters = new URLSearchParams({ status, flow, cursor, limit: String(pageSize) });
+      if (activityId) filters.set("activityId", activityId);
+      const response = await fetch("/api/attendance/requests?" + filters, { signal: controller.signal, cache: "no-store" });
+      const data = await response.json();
+      if (!response.ok) throw Error(data.error || "Chưa tải được đề nghị.");
+      if (activeRequest.current !== controller) return;
+      const current: Row[] = data.rows;
+      setRows(current); setAdmin(data.admin); setNextCursor(data.nextCursor || null); setError("");
+      setSelected(old => old.filter(id => current.some(row => row.id === id)));
+      loadedAt.current = Date.now();
+    } catch (err) {
+      if (activeRequest.current === controller) setError(controller.signal.aborted ? "Tải đề nghị quá lâu. Hãy bấm Làm mới." : err instanceof Error ? err.message : "Chưa tải được đề nghị.");
+    } finally {
+      clearTimeout(timeout);
+      if (activeRequest.current === controller) { activeRequest.current = null; setLoading(false); }
+    }
+  }, [activityId, cursor, flow, pageSize, status, setSelected]);
+
+  useEffect(() => {
+    function idle() {
+      return !document.hidden && !lock.current && !activeRequest.current &&
+        !inbox.current?.querySelector("details[open],dialog[open],input:checked,input[type=search]:focus");
+    }
+    function refreshIfStale() {
+      if (idle() && Date.now() - loadedAt.current >= refreshInterval) void refresh();
+    }
     let debounce: ReturnType<typeof setTimeout>;
-    const update=()=>{clearTimeout(debounce);debounce=setTimeout(load,500);};
-    window.addEventListener("attendance-requests-changed",update);
-    document.addEventListener("visibilitychange",load);
-    const timer=setInterval(load,30000);
-    return()=>{controller.abort();activeRequest.current?.abort();clearInterval(timer);clearTimeout(debounce);window.removeEventListener("attendance-requests-changed",update);document.removeEventListener("visibilitychange",load);};
-  },[refresh]);
-  async function review(ids:string[],action:"approve"|"reject",reason="") {
-    if(lock.current || !ids.length)return;
-    if(action==="reject"&&!reason.trim()){setRejectIds(ids);setRejectReason("");return;}
-    lock.current=true;setBusy(true);setNotice("");let ok=0;const failures:string[]=[];
-    try {
-      for(const id of ids){
-        try {const response=await fetch("/api/attendance/requests",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id,action,reason}),signal:AbortSignal.timeout(20000)});const data=await response.json();if(!response.ok)throw Error(data.error);if(data.alreadyReviewed && data.status !== (action==="approve"?"approved":"rejected"))throw Error("Đề nghị đã được xử lý theo trạng thái khác.");ok++;}
-        catch(e){failures.push(`${rows.find(r=>r.id===id)?.studentId || id}: ${e instanceof Error?e.message:"Chưa xác nhận"}`);}
-      }
-      setSelected([]);setRejectIds([]);setRejectReason("");await refresh();setNotice(`Đã xử lý ${ok}/${ids.length} đề nghị.`);if(failures.length)setError(failures.join("\n"));
-    }finally{lock.current=false;setBusy(false);}
+    const changed = () => {
+      loadedAt.current = 0;
+      clearTimeout(debounce);
+      debounce = setTimeout(refreshIfStale, 400);
+    };
+    const initial = setTimeout(() => { if (!document.hidden) void refresh(); }, 0);
+    const timer = setInterval(refreshIfStale, refreshInterval);
+    document.addEventListener("visibilitychange", refreshIfStale);
+    window.addEventListener("attendance-requests-changed", changed);
+    return () => {
+      clearTimeout(initial); clearTimeout(debounce); clearInterval(timer);
+      document.removeEventListener("visibilitychange", refreshIfStale);
+      window.removeEventListener("attendance-requests-changed", changed);
+      activeRequest.current?.abort(); activeRequest.current = null;
+    };
+  }, [refresh]);
+
+  useEffect(() => {
+    const dialog = rejection.current;
+    if (rejectIds.length && dialog && !dialog.open) dialog.showModal();
+    else if (!rejectIds.length && dialog?.open) dialog.close();
+  }, [rejectIds]);
+
+  const batches = useMemo(() => {
+    const key = searchKey(search);
+    return approvalBatches(rows.filter(row => {
+      if ((row.flow || (row.kind === "award" ? "department" : "group")) !== flow) return false;
+      return !key || searchKey([row.memberName, row.studentId, row.submittedBy, row.activityName, row.taskName, row.sessionDate, row.sessionName].join(" ")).includes(key);
+    }));
+  }, [rows, search, flow]);
+  const visibleIds = batches.flatMap(batch => batch.rows.map(row => row.id));
+  const chosen = selected.filter(id => visibleIds.includes(id));
+  const canReview = admin && status === "pending";
+  const paginated = pages.length > 1 || Boolean(nextCursor);
+
+  function resetView() {
+    activeRequest.current?.abort(); activeRequest.current = null; loadedAt.current = 0;
+    setLoading(true); setRows([]); setNextCursor(null); setSelected([]); setExpanded([]); setRejectIds([]);
+    setNotice(""); setError("");
   }
-  return <section className="rounded-2xl border border-amber-200 bg-white p-5 space-y-3">
-    {rejectIds.length>0&&<div role="dialog" aria-label="Từ chối đề nghị" className="space-y-3 rounded-xl border border-rose-200 bg-rose-50 p-4"><label className="block text-sm font-semibold">Lý do từ chối {rejectIds.length} đề nghị<textarea autoFocus rows={3} maxLength={1000} value={rejectReason} disabled={busy} onChange={e=>setRejectReason(e.target.value)} className="mt-2 w-full rounded-lg border bg-white p-3"/></label><div className="flex gap-3"><button disabled={busy||!rejectReason.trim()} onClick={()=>void review(rejectIds,"reject",rejectReason)} className="min-h-11 rounded-lg bg-rose-600 px-4 text-white disabled:opacity-50">Xác nhận từ chối</button><button disabled={busy} onClick={()=>setRejectIds([])} className="min-h-11 px-3">Hủy</button></div></div>}
-    <div className="flex flex-wrap justify-between gap-3"><div><h2 className="font-bold text-lg">{admin?"Duyệt điểm danh tổ / ban, mảng":"Đề nghị đã gửi"}</h2><p className="text-sm text-slate-500">Chờ duyệt chưa tính vào số buổi hoặc danh sách điểm danh chính thức.</p></div><button type="button" disabled={busy} className="text-sm text-sky-700" onClick={()=>void refresh()}>Làm mới</button></div>
-    <div className="flex flex-wrap gap-2">{[["pending","Chờ duyệt"],["approved","Đã duyệt"],["rejected","Từ chối"]].map(([value,label])=><button type="button" disabled={busy} key={value} className={`rounded-lg border px-3 py-2 text-sm ${status===value?"bg-sky-600 text-white":""}`} onClick={()=>{setStatus(value);setNotice("");}}>{label}{value===status?` (${rows.length})`:""}</button>)}</div>
-    {error&&<p role="alert" className="whitespace-pre-line text-sm text-red-700">{error}</p>}{notice&&<p role="status" className="text-sm text-sky-700">{notice}</p>}
-    {admin&&status==="pending"&&rows.length>0&&<div className="flex flex-wrap gap-3 items-center text-sm"><label><input type="checkbox" disabled={busy} checked={rows.length>0&&selected.length===rows.length} onChange={e=>setSelected(e.target.checked?rows.map(r=>r.id):[])} /> Chọn tất cả</label><button type="button" disabled={busy||!selected.length} className="rounded-lg bg-emerald-600 px-3 py-2 text-white disabled:opacity-50" onClick={()=>void review(selected,"approve")}>{busy?"Đang xử lý…":`Duyệt ${selected.length} đề nghị đã chọn`}</button><button type="button" disabled={busy||!selected.length} className="text-red-700 disabled:opacity-50" onClick={()=>void review(selected,"reject")}>Từ chối đã chọn</button></div>}
-    <div className="max-h-[32rem] overflow-auto space-y-2">{loading?<p>Đang tải…</p>:!rows.length?<p className="text-sm text-slate-500">Chưa có đề nghị ở trạng thái này. Sau khi kiểm tra MSSV, cần bấm gửi danh sách và chờ thông báo “Chờ admin duyệt”. Chỉ tạo hoạt động chưa phải là gửi đề nghị.</p>:approvalBatches(rows).map(batch=><details key={batch.key} className="rounded-xl border p-3"><summary className="cursor-pointer space-y-1"><strong>{batch.rows[0].activityName || batch.rows[0].taskName || "Đề nghị điểm danh"} · {batch.rows.length} người</strong><p className="text-sm">Người gửi: <strong>{batch.rows[0].submittedBy}</strong> · {batch.rows[0].accessGroup ? `Tổ ${batch.rows[0].accessGroup}` : "Toàn đội"}</p><p className="text-xs text-slate-500">{batch.rows[0].batchId ? `Đợt ${batch.rows[0].batchId.split(":").pop()?.slice(0,8)}` : "Đề nghị cũ / riêng lẻ"} · Bấm xem chi tiết</p></summary>{admin&&status==="pending"&&<div className="flex flex-wrap gap-3 py-3"><button disabled={busy} className="min-h-11 rounded-lg bg-emerald-600 px-3 text-white" onClick={()=>void review(batch.rows.map(r=>r.id),"approve")}>Duyệt {batch.rows.length} người trong đợt</button><button disabled={busy} className="min-h-11 px-3 text-red-700" onClick={()=>void review(batch.rows.map(r=>r.id),"reject")}>Từ chối đợt</button></div>}{batch.rows.map(row=><article key={row.id} className="rounded-xl border p-3 text-sm space-y-1"><div className="flex gap-2">{admin&&status==="pending"&&<input aria-label={`Chọn ${row.studentId}`} type="checkbox" disabled={busy} checked={selected.includes(row.id)} onChange={e=>setSelected(old=>e.target.checked?[...old,row.id]:old.filter(id=>id!==row.id))}/>}<strong>{row.memberName} · {row.studentId}</strong></div><p>{row.kind==="award"?row.taskName:row.activityName} · Đề nghị {row.points} buổi</p>{row.workDescription&&<p className="whitespace-pre-wrap">{row.workDescription}</p>}{row.productLink&&<p className="break-all text-slate-500">Minh chứng: {row.productLink}</p>}<p className="text-slate-500">Người gửi: <strong className="text-slate-900">{row.submittedBy || "Chưa có tên người gửi"}</strong> · {new Date(row.time).toLocaleString("vi-VN")}</p><p className="font-semibold text-amber-700">{row.status==="pending"?"Chờ duyệt":row.status==="approved"?`Đã duyệt · ${row.reviewedBy || "Admin"}`:`Từ chối · ${row.reason || "Không có ghi chú"}`}</p>{admin&&status==="pending"&&<div className="flex gap-4 pt-2"><button type="button" disabled={busy} className="font-semibold text-emerald-700" onClick={()=>void review([row.id],"approve")}>Duyệt</button><button type="button" disabled={busy} className="text-red-700" onClick={()=>void review([row.id],"reject")}>Từ chối</button></div>}</article>)}</details>)}</div>
+
+  async function review(ids: string[], action: "approve" | "reject") {
+    if (!canReview || lock.current || !ids.length) return;
+    const explanation = action === "reject" ? reason.trim() : "";
+    if (action === "reject" && !explanation) return;
+    lock.current = true; setBusy(true); setNotice(""); setError("");
+    const failed: string[] = [];
+    try {
+      for (const id of ids) {
+        try {
+          const response = await fetch("/api/attendance/requests", {
+            method: "POST", headers: { "Content-Type": "application/json" }, signal: AbortSignal.timeout(20000),
+            body: JSON.stringify({ id, action, reason: explanation }),
+          });
+          const result = await response.json();
+          if (!response.ok) throw Error(result.error || "Chưa lưu được.");
+          if (result.alreadyReviewed && result.status !== (action === "approve" ? "approved" : "rejected")) throw Error("Đề nghị đã được xử lý theo trạng thái khác.");
+        } catch (err) { failed.push((rows.find(row => row.id === id)?.studentId || id) + " · " + (err instanceof Error ? err.message : "Chưa xác nhận")); }
+      }
+      setSelected([]); setRejectIds([]); setReason("");
+      await refresh();
+      const succeeded = ids.length - failed.length;
+      if (succeeded) setNotice((action === "approve" ? "Đã duyệt " : "Đã từ chối ") + succeeded + "/" + ids.length + " lượt.");
+      if (failed.length) setError(failed.join("\n"));
+    } finally { lock.current = false; setBusy(false); }
+  }
+
+  function askReason(ids: string[]) {
+    setReason(""); setRejectIds(ids);
+  }
+
+  return <section ref={inbox} className={styles.inbox} aria-label="Danh sách đề nghị điểm danh">
+    <div className={styles.toolbar}>
+      <div role="group" aria-label="Trạng thái đề nghị" className={styles.statuses}>
+        {(Object.keys(statuses) as Status[]).map(value => <button key={value} type="button" disabled={busy} aria-pressed={value === status}
+          onClick={() => { if (value !== status) { resetView(); setPages([""]); setStatus(value); } }}>{statuses[value]}</button>)}
+      </div>
+      <button type="button" className={styles.refresh} aria-label="Làm mới danh sách" title="Làm mới danh sách" disabled={busy || loading}
+        onClick={() => { setLoading(true); void refresh(); }}><WorkspaceIcon name="refresh" /></button>
+    </div>
+    <div className={styles.filters}>
+      {!activityId && <select aria-label="Loại điểm danh" disabled={busy} value={flow} onChange={e => {
+        resetView(); setPages([""]); setSearch(""); setFlow(e.target.value as AttendanceFlow);
+      }}><option value="group">Hoạt động</option><option value="department">Mảng</option></select>}
+      <label className={styles.search}>
+        <WorkspaceIcon name="search" /><input aria-label="Tìm đề nghị trong trang" type="search" value={search} disabled={busy}
+          placeholder="Tìm tên, MSSV, hoạt động" onChange={e => { setSearch(e.target.value); setSelected([]); setNotice(""); }} />
+      </label>
+    </div>
+    <div className={styles.caption}>
+      <strong>{loading ? "Đang tải đề nghị…" : admin ? "Đề nghị cần kiểm tra" : "Đề nghị bạn đã gửi"}</strong>
+      {!loading && <span>{batches.length} đợt · {visibleIds.length} lượt</span>}
+    </div>
+    {error && <p role="alert" className={styles.error}>{error}</p>}
+    {notice && <p role="status" className={styles.notice}>{notice}</p>}
+    {canReview && !loading && visibleIds.length > 0 && <div className={styles.selection}>
+      <label><input type="checkbox" aria-label="Chọn tất cả lượt hiển thị" disabled={busy} checked={chosen.length === visibleIds.length}
+        ref={el => { if (el) el.indeterminate = chosen.length > 0 && chosen.length < visibleIds.length; }}
+        onChange={e => setSelected(e.target.checked ? visibleIds : [])} />{chosen.length ? "Đã chọn " + chosen.length + " lượt" : "Chọn " + visibleIds.length + " lượt hiển thị"}</label>
+      {chosen.length > 0 && <div className={styles.actions}>
+        <button className={styles.approve} disabled={busy} onClick={() => void review(chosen, "approve")}>Duyệt đã chọn ({chosen.length})</button>
+        <button className={styles.reject} disabled={busy} onClick={() => askReason(chosen)}>Từ chối đã chọn</button>
+      </div>}
+    </div>}
+    {loading ? <p role="status" className={styles.empty}>Đang tải danh sách…</p>
+      : !batches.length ? <div className={styles.empty}>
+        {search.trim() ? <>Không tìm thấy đề nghị trong trang này. <button onClick={() => { setSearch(""); setSelected([]); }}>Xóa tìm kiếm</button></>
+          : error ? "Danh sách chưa tải được." : "Không có đề nghị ở trạng thái này."}
+      </div> : <div className={styles.list}>{batches.map(batch => {
+        const first = batch.rows[0];
+        const date = first.sessionDate?.split("-").reverse().join("/") || "Chưa rõ ngày";
+        const sender = first.submittedBy || "Chưa ghi người gửi";
+        const people = new Set(batch.rows.map(row => row.studentId || row.id)).size;
+        const isOpen = expanded.includes(batch.key);
+        return <details key={batch.key} className={styles.batch} open={isOpen} onToggle={event => {
+          const open = event.currentTarget.open;
+          setExpanded(old => old.includes(batch.key) === open ? old : open ? [...old, batch.key] : old.filter(key => key !== batch.key));
+        }}>
+          <summary>
+            <span aria-hidden="true" className={styles.chevron}>›</span>
+            <span className={styles.identity}><span role="heading" aria-level={3} className={styles.title}>{first.activityName || first.taskName || "Đề nghị điểm danh"}</span>
+              <small>{date} · {first.sessionName || "Buổi cũ"}{first.activityDepartment && " · " + (first.activityDepartment === "su-kien" ? "Sự kiện" : "Truyền thông")}</small>
+              <small>{sender}</small></span>
+            <span className={styles.quantity}>{batch.rows.length} lượt</span>
+          </summary>
+          {isOpen && <div className={styles.members}>
+            <p className={styles.sent}>{people} người · {first.time ? timeFormat.format(first.time) : "Chưa ghi giờ gửi"}</p>
+            {canReview && !chosen.length && batch.rows.length > 1 && <div className={styles.actions}>
+              <button className={styles.approve} disabled={busy} onClick={() => void review(batch.rows.map(row => row.id), "approve")}>Duyệt {batch.rows.length} lượt trong đợt</button>
+              <button className={styles.reject} disabled={busy} onClick={() => askReason(batch.rows.map(row => row.id))}>Từ chối {batch.rows.length} lượt</button>
+            </div>}
+            {batch.rows.map(row => <article key={row.id} className={styles.person}>
+              <div className={styles.personHeading}>
+                {canReview && <input aria-label={"Chọn " + row.memberName + " " + row.studentId} type="checkbox" disabled={busy}
+                  checked={selected.includes(row.id)} onChange={e => setSelected(old => e.target.checked ? [...old, row.id] : old.filter(id => id !== row.id))} />}
+                <span><strong>{row.memberName}</strong><small>{row.studentId}{row.accessGroup && " · Tổ " + row.accessGroup}</small></span>
+                <b className={styles.points}>{row.points} buổi</b>
+              </div>
+              {row.workDescription && <p>{row.workDescription}</p>}
+              {row.productLink && <p>Minh chứng · {row.productLink}</p>}
+              {status === "approved" && <p>Đã duyệt bởi {row.reviewedBy || "Admin"}.</p>}
+              {status === "rejected" && <p>Lý do từ chối · {row.reason || "Chưa ghi lý do"}</p>}
+              {canReview && !chosen.length && <div className={styles.actions}>
+                <button disabled={busy} className={styles.approve} onClick={() => void review([row.id], "approve")}>Duyệt</button>
+                <button disabled={busy} className={styles.reject} onClick={() => askReason([row.id])}>Từ chối</button>
+              </div>}
+            </article>)}
+          </div>}
+        </details>;
+      })}</div>}
+    {(paginated || pageSize !== pageSizes[0]) && <nav className={styles.pager} aria-label="Phân trang đề nghị">
+      <label><select aria-label="Số lượt mỗi trang" disabled={busy || loading} value={pageSize} onChange={e => {
+        resetView(); setPages([""]); setPageSize(Number(e.target.value));
+      }}>{pageSizes.map(size => <option key={size} value={size}>{size} lượt/trang</option>)}</select></label>
+      <span>Trang {pages.length}</span>
+      <button disabled={busy || loading || pages.length === 1} onClick={() => { resetView(); setPages(old => old.slice(0, -1)); }}>Trước</button>
+      <button disabled={busy || loading || !nextCursor} onClick={() => { if (nextCursor) { resetView(); setPages(old => [...old, nextCursor]); } }}>Sau</button>
+    </nav>}
+    {paginated && <p className={styles.sent}>Tìm kiếm và chọn lượt áp dụng trong trang đang xem.</p>}
+
+    <dialog className={styles.dialog} ref={rejection} aria-labelledby="reject-attendance-heading"
+      onCancel={e => { if (lock.current) e.preventDefault(); }}
+      onClose={e => { if (!e.currentTarget.open) setRejectIds([]); }}>
+      <form onSubmit={e => { e.preventDefault(); void review(rejectIds, "reject"); }}>
+        <h2 id="reject-attendance-heading">Từ chối đề nghị</h2>
+        <label>Lý do từ chối {rejectIds.length} lượt
+          <textarea required autoFocus maxLength={1000} rows={3} value={reason} disabled={busy} onChange={e => setReason(e.target.value)} />
+        </label>
+        <div className={styles.actions}>
+          <button type="button" disabled={busy} className={styles.neutral} onClick={() => setRejectIds([])}>Hủy</button>
+          <button type="submit" className={styles.reject} disabled={busy || !reason.trim()}>{busy ? "Đang xử lý…" : "Xác nhận từ chối"}</button>
+        </div>
+      </form>
+    </dialog>
   </section>;
 }

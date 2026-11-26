@@ -1,0 +1,64 @@
+.refresh, .export {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 36px; padding: 7px 13px; border-radius: 8px; font-size: 12px; font-weight: 600;
+}
+.refresh { margin-left: auto; color: #1d5ab3; background: var(--paper); }
+.refresh svg, .export svg { width: 16px; height: 16px; }
+.refresh:disabled, .export:disabled { opacity: .6; }
+.folderNav { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 245px); gap: clamp(12px, 1.8vw, 26px); margin-top: 10px; }
+.folderNav .sectionButton {
+  gap: 14px; min-height: 108px; padding: 26px 16px 14px; text-align: left;
+  justify-content: space-between; align-items: start; font-size: 13px; line-height: 1.35;
+}
+.sectionIcon { display: grid; place-items: center; width: 31px; height: 31px; border-radius: 10px; color: #255cab; background: #dae6f6; }
+.sectionIcon svg { width: 18px; height: 18px; }
+.sectionIcon[data-section=transfer] { color: #27755d; background: #d9eee5; }
+.sectionIcon[data-section=history] { color: #975b1b; background: #f6e8d4; }
+.sectionIcon[data-section=report] { color: #7051a0; background: #e8e0f6; }
+.sectionButton[aria-pressed=true] .sectionIcon { color: white; background: #ffffff27; }
+.panel { margin-top: 30px; min-width: 0; outline: none; }
+.hint, .disclosure p { margin: 8px 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.error { padding: 10px 12px; margin-bottom: 12px; color: #963a31; background: #fff1ed; border-radius: 6px; }
+.workList li { border-bottom: 1px solid #eef1f6; }
+.workList li > * {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 64px;
+  padding: 9px 6px; text-align: left; font-size: 13px;
+}
+.workList li > :hover { background: #f2f6ff; }
+.workIcon { flex: none; display: grid; place-items: center; width: 31px; height: 31px; border-radius: 9px; color: #2860a8; background: #edf3fd; }
+.workIcon svg { width: 17px; height: 17px; }
+.workTitle { display: grid; gap: 2px; margin-right: auto; min-width: 0; }
+.workTitle small, .disclosure small { color: var(--muted); font-size: 12px; font-weight: 400; }
+.workList b { white-space: nowrap; color: #325b8b; font-size: 12px; font-variant-numeric: tabular-nums; }
+.workList li > * > svg { flex: none; width: 14px; height: 14px; color: #6d839c; }
+.disclosure { margin-top: 10px; border-bottom: 1px solid #edf0f5; }
+.disclosure summary { min-height: 42px; padding: 11px 0; font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.disclosure small { margin-left: 8px; }
+.disclosure p { overflow-wrap: anywhere; }
+.failure { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 0; font-size: 12px; }
+.failure a { color: var(--blue); text-decoration: underline; }
+.failure button { color: var(--blue); min-height: 36px; }
+.reportFilters { display: grid; grid-template-columns: 1.6fr 1.1fr .9fr 1fr; gap: 12px; margin: 10px 0 18px; }
+.reportFilters > div { display: grid; align-content: start; gap: 5px; min-width: 0; color: var(--muted); font-size: 12px; }
+.reportFilters :is(select,input) { min-width: 0; width: 100%; min-height: 38px; padding: 6px 9px; border: 1px solid #dce5f0; border-radius: 8px; background: white; color: var(--ink); font: inherit; }
+.reportTotals { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.reportTotals article { padding: 13px 15px; border-radius: 10px; background: #f2f6fc; font-size: 13px; }
+.reportTotals p { margin-top: 3px; color: var(--muted); }
+.export { margin-top: 10px; background: var(--blue); color: white; }
+.transfer > section { border: 0; border-radius: 0; padding: 0; }
+.transfer h2 { font-size: 16px; }
+.transfer article { padding: 13px 0; border: 0; border-bottom: 1px solid #edf0f5; border-radius: 0; }
+@media (max-width: 800px) {
+  .reportFilters { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
+@media (max-width: 640px) {
+  .folderNav { grid-auto-flow: row; grid-auto-columns: auto; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; }
+  .folderNav .sectionButton { min-height: 86px; gap: 7px; padding: 19px 12px 10px; }
+  .sectionIcon { width: 25px; height: 25px; }
+  .sectionIcon svg { width: 15px; height: 15px; }
+  .panel { margin-top: 20px; }
+  .refresh, .export, .failure button, .reportFilters :is(select,input) { min-height: 44px; }
+  .workList li > * { gap: 8px; padding-inline: 0; }
+  .reportFilters > div:first-child { grid-column: 1 / -1; }
+  .reportTotals { grid-template-columns: 1fr; }
+}

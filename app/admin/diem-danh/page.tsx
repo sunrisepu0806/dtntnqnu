@@ -1,192 +1,167 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
+import { WorkspaceIcon } from "@/components/admin/workspace-navigation";
+import type { ActivitySession } from "@/lib/activity-model";
+import { vietnamDay } from "@/lib/attendance-day";
+import { searchKey } from "@/lib/search-text";
+import AdminWorkspace from "../AdminWorkspace";
+import workspace from "../overview.module.css";
+import AttendanceSections from "./AttendanceSections";
+import styles from "./attendance.module.css";
 
-import { collection, onSnapshot } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+type Activity = { id: string; name: string; sessions: ActivitySession[] };
+type Filter = "today" | "all";
 
-interface ThongKeTongQuan {
-  tongThanhVien: number;
-  tongSuKien: number;
-  tongLuotDiemDanh: number;
-  dangTai: boolean;
+function dateLabel(date: string) {
+  return date ? date.split("-").reverse().join("/") : "Chưa có ngày";
 }
 
-export default function BangDieuPhoiDiemDanh() {
-  const [thongKe, setThongKe] = useState<ThongKeTongQuan>({
-    tongThanhVien: 0,
-    tongSuKien: 0,
-    tongLuotDiemDanh: 0,
-    dangTai: true,
-  });
+export default function AttendanceHome() {
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [pending, setPending] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [revision, setRevision] = useState(0);
+  const [search, setSearch] = useState("");
+  const [preferredFilter, setPreferredFilter] = useState<Filter | null>(null);
+  const [activityId, setActivityId] = useState("");
+  const [sessionId, setSessionId] = useState("");
+  const activityPanel = useRef<HTMLElement>(null);
+  const sessionPanel = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    const unsubUsers = onSnapshot(collection(db, "users"), (snap) => {
-      let luotDiemDanh = 0;
-      snap.docs.forEach((d) => {
-        luotDiemDanh += Number(d.data().soBuoiDiemDanh || 0);
-      });
+    const controller = new AbortController();
+    async function load() {
+      try {
+        const response = await fetch("/api/attendance/activities?flow=group", { signal: controller.signal });
+        const data = await response.json();
+        if (!response.ok) throw Error(data.error || "Không tải được danh sách hoạt động.");
+        if (!controller.signal.aborted) setActivities(data.activities);
+      } catch (err) {
+        if (!controller.signal.aborted) setError(err instanceof Error ? err.message : "Không tải được danh sách hoạt động.");
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    }
+    void load();
+    return () => controller.abort();
+  }, [revision]);
 
-      setThongKe((prev) => ({
-        ...prev,
-        tongThanhVien: snap.size,
-        tongLuotDiemDanh: luotDiemDanh,
-        dangTai: false,
-      }));
-    });
-
-    const unsubEvents = onSnapshot(collection(db, "activities"), (snap) => {
-      setThongKe((prev) => ({
-        ...prev,
-        tongSuKien: snap.size,
-      }));
-    });
-
-    return () => {
-      unsubUsers();
-      unsubEvents();
-    };
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/attendance/requests?status=pending&countOnly=true", { signal: controller.signal })
+      .then(async response => {
+        if (response.ok) {
+          const data = await response.json();
+          if (!controller.signal.aborted) setPending(data.count);
+        }
+      }).catch(() => { /* The approval link is also available without a count. */ });
+    return () => controller.abort();
   }, []);
 
-  const danhSachPhanHe = [
-    {
-      tieuDe: "Máy Quét Mã QR",
-      moTa: "Mở máy ảnh nhận diện mã QR điểm danh trực tiếp cho thành viên.",
-      duongDan: "/admin/diem-danh/quet-ma",
-      tag: "QR SCAN",
-      mauTag: "text-sky-700 bg-sky-50 border-sky-200",
-      iconBg: "bg-sky-500/10 text-[#0284c7]",
-    },
-    {
-      tieuDe: "Quản Lý Hoạt Động",
-      moTa: "Tạo sự kiện, bật/tắt phiên quét và thống kê số liệu ca tham gia.",
-      duongDan: "/admin/diem-danh/hoat-dong",
-      tag: "SỰ KIỆN",
-      mauTag: "text-emerald-700 bg-emerald-50 border-emerald-200",
-      iconBg: "bg-emerald-500/10 text-emerald-600",
-    },
-    {
-      tieuDe: "Cơ Cấu Tổ Sinh Hoạt",
-      moTa: "Theo dõi thành viên 5 Tổ và bảng tổng hợp nội bộ.",
-      duongDan: "/admin/diem-danh/to-truong",
-      tag: "5 TỔ",
-      mauTag: "text-indigo-700 bg-indigo-50 border-indigo-200",
-      iconBg: "bg-indigo-500/10 text-indigo-600",
-    },
-    {
-      tieuDe: "Phân Ban Chuyên Môn",
-      moTa: "Phân chia và ghi nhận lượt công tác Ban Sự kiện & Truyền thông.",
-      duongDan: "/admin/diem-danh/truong-ban",
-      tag: "CHUYÊN MÔN",
-      mauTag: "text-amber-700 bg-amber-50 border-amber-200",
-      iconBg: "bg-amber-500/10 text-amber-600",
-    },
-  ];
+  const today = vietnamDay(new Date());
+  const hasSessionToday = (activity: Activity) => activity.sessions.some(session => session.date === today);
+  const filter = preferredFilter ?? (activities.some(hasSessionToday) ? "today" : "all");
+  const query = searchKey(search);
+  const visible = activities.filter(activity => (filter === "all" || hasSessionToday(activity)) && searchKey(activity.name).includes(query));
+  const chosen = visible.find(activity => activity.id === activityId);
+  const session = chosen?.sessions.find(item => item.id === sessionId);
+
+  function clearSelection() {
+    setActivityId("");
+    setSessionId("");
+  }
+
+  function changeSearch(value: string) {
+    setSearch(value);
+    if (chosen && !searchKey(chosen.name).includes(searchKey(value))) clearSelection();
+  }
+
+  function changeFilter(value: Filter) {
+    setPreferredFilter(value);
+    if (value === "today" && chosen && !hasSessionToday(chosen)) clearSelection();
+  }
+
+  function chooseActivity(id: string) {
+    if (id !== activityId) setSessionId("");
+    setActivityId(id);
+    if (window.matchMedia("(max-width: 760px)").matches) {
+      requestAnimationFrame(() => {
+        sessionPanel.current?.focus({ preventScroll: true });
+        const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        sessionPanel.current?.scrollIntoView({ block: "start", behavior: reduceMotion ? "instant" : "smooth" });
+      });
+    }
+  }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-5 font-sans select-none space-y-4">
-      {/* THANH TIÊU ĐỀ COMPACT */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white border border-slate-200 rounded-2xl px-5 py-3.5 shadow-xs">
-        <div>
-          <h1 className="text-base sm:text-lg font-black text-slate-900 tracking-tight uppercase">
-            Bảng Điều Phối Điểm Danh
-          </h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Cổng điều hành kết nối máy quét QR, ca hoạt động, cơ cấu tổ và phân ban
-          </p>
-        </div>
+    <AdminWorkspace search={search} onSearch={changeSearch} searchLabel="Tìm hoạt động"
+      onSearchSubmit={() => activityPanel.current?.focus()} attendanceLabel="Chọn ca điểm danh">
+      <header className={workspace.titleRow}>
+        <h1>Điểm danh</h1>
+      </header>
+      <AttendanceSections active="activity" pending={pending} />
 
-        <Link
-          href="/admin/diem-danh/quet-ma"
-          className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] text-white text-xs font-bold uppercase tracking-wider transition shadow-xs self-start sm:self-auto cursor-pointer"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
-          </svg>
-          Mở Máy Quét QR
-        </Link>
-      </div>
-
-      <Link href="/admin/duyet-diem-danh" className="inline-flex rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800">Xem danh sách gửi duyệt →</Link>
-      {/* 3 CHỈ SỐ THỐNG KÊ (DÀN NGANG GỌN GÀNG) */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
-              Tổng Thành Viên
-            </span>
-            <p className="text-2xl font-black text-slate-900 mt-1">
-              {thongKe.dangTai ? "..." : thongKe.tongThanhVien}
-            </p>
+      <div className={styles.choices}>
+        <section ref={activityPanel} id="chon-hoat-dong" tabIndex={-1} className={styles.step} aria-labelledby="activity-title">
+          <div className={styles.stepHeading}>
+            <h2 id="activity-title"><span className={styles.stepNumber}>1</span>Chọn hoạt động</h2>
+            {!loading && !error && <span>{activities.length} đang mở</span>}
           </div>
-          <span className="px-2.5 py-1 rounded-lg bg-sky-50 text-[#0284c7] border border-sky-100 text-[11px] font-black uppercase">
-            Thành viên
-          </span>
-        </div>
-
-        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
-              Sự Kiện & Ca
-            </span>
-            <p className="text-2xl font-black text-emerald-600 mt-1">
-              {thongKe.dangTai ? "..." : thongKe.tongSuKien}
-            </p>
+          <div className={styles.filters} role="group" aria-label="Lọc hoạt động">
+            <button type="button" aria-pressed={filter === "today"} onClick={() => changeFilter("today")}>Hôm nay</button>
+            <button type="button" aria-pressed={filter === "all"} onClick={() => changeFilter("all")}>Tất cả đang mở</button>
           </div>
-          <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-100 text-[11px] font-black uppercase">
-            Hoạt động
-          </span>
-        </div>
-
-        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
-              Tổng Lượt Điểm Danh
-            </span>
-            <p className="text-2xl font-black text-[#0284c7] mt-1">
-              {thongKe.dangTai ? "..." : thongKe.tongLuotDiemDanh}
-            </p>
-          </div>
-          <span className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-100 text-[11px] font-black uppercase">
-            Buổi ghi nhận (hoạt động + ban)
-          </span>
-        </div>
-      </div>
-
-      {/* 4 PHÂN HỆ ĐIỀU PHỐI (LƯỚI COMPACT DỄ QUAN SÁT) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-        {danhSachPhanHe.map((item) => (
-          <Link
-            key={item.duongDan}
-            href={item.duongDan}
-            className="group bg-white border border-slate-200 hover:border-[#0284c7]/60 hover:shadow-md rounded-2xl p-4 sm:p-5 transition flex flex-col justify-between cursor-pointer"
-          >
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase border ${item.mauTag}`}>
-                  {item.tag}
-                </span>
-                <span className="text-xs font-bold text-slate-400 group-hover:text-[#0284c7] transition flex items-center gap-1">
-                  Truy cập
-                  <svg className="w-3.5 h-3.5 transform group-hover:translate-x-0.5 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </span>
-              </div>
-
-              <div>
-                <h2 className="text-sm sm:text-base font-bold text-slate-900 group-hover:text-[#0284c7] transition">
-                  {item.tieuDe}
-                </h2>
-                <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                  {item.moTa}
-                </p>
-              </div>
+          {loading ? <p className={styles.empty} role="status">Đang tải hoạt động…</p> : error ? (
+            <div className={styles.empty} role="alert"><p>{error}</p>
+              <button type="button" className={styles.textButton} onClick={() => {
+                setError(""); setLoading(true); setRevision(value => value + 1);
+              }}>Thử lại</button>
             </div>
-          </Link>
-        ))}
+          ) : visible.length ? (
+            <div className={styles.list} role="group" aria-label="Các hoạt động đang mở">
+              {visible.map(activity => (
+                <button key={activity.id} type="button" aria-pressed={chosen?.id === activity.id} onClick={() => chooseActivity(activity.id)}>
+                  <span className={styles.rowIcon}><WorkspaceIcon name="calendar" /></span>
+                  <span className={styles.rowText}><strong>{activity.name}</strong>
+                    <small>{activity.sessions.length} ca{hasSessionToday(activity) && " · Có ca hôm nay"}</small>
+                  </span>
+                  <WorkspaceIcon name="next" />
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className={styles.empty} role="status">
+              <p>{query ? "Không tìm thấy hoạt động phù hợp." : filter === "today" ? "Hôm nay chưa có ca điểm danh." : "Chưa có hoạt động đang mở."}</p>
+              {query && <button type="button" className={styles.textButton} onClick={() => changeSearch("")}>Xóa tìm kiếm</button>}
+              {filter === "today" && <button type="button" className={styles.textButton} onClick={() => changeFilter("all")}>Xem tất cả đang mở</button>}
+              {!query && filter === "all" && <Link href="/admin/diem-danh/hoat-dong" className={styles.textButton}>Tạo hoạt động</Link>}
+            </div>
+          )}
+        </section>
+
+        <section ref={sessionPanel} tabIndex={-1} className={styles.step} aria-labelledby="session-title">
+          <div className={styles.stepHeading}><h2 id="session-title"><span className={styles.stepNumber}>2</span>Chọn ca</h2></div>
+          {!chosen ? <p className={styles.empty}>Chọn một hoạt động để xem các ca điểm danh.</p> : <>
+            <p className={styles.selectedName}>{chosen.name}</p>
+            {chosen.sessions.length ? <div className={styles.list} role="group" aria-label="Các ca của hoạt động">
+              {chosen.sessions.map(item => (
+                <button key={item.id} type="button" aria-pressed={session?.id === item.id} onClick={() => setSessionId(item.id)}>
+                  <span className={styles.radioDot} aria-hidden="true" />
+                  <span className={styles.rowText}><strong>{item.name}</strong><small>{dateLabel(item.date)}{item.date === today && " · Hôm nay"}</small></span>
+                </button>
+              ))}
+            </div> : <p className={styles.empty}>Hoạt động chưa có ca. <Link className={styles.textButton} href="/admin/diem-danh/hoat-dong">Quản lý hoạt động</Link></p>}
+            {session ? (
+              <Link className={styles.continueButton} href={{ pathname: "/admin/diem-danh/quet-ma", query: { activityId: chosen.id, sessionId: session.id } }}>
+                Tiếp tục điểm danh <WorkspaceIcon name="next" />
+              </Link>
+            ) : <button type="button" className={styles.continueButton} disabled>Tiếp tục điểm danh <WorkspaceIcon name="next" /></button>}
+          </>}
+        </section>
       </div>
-    </div>
+    </AdminWorkspace>
   );
 }
