@@ -23,10 +23,14 @@ const nameOrder = new Intl.Collator("vi", { numeric: true });
 const avatarFor = (m: Member) => /^https?:\/\//i.test(m.avatarUrl || "") ? m.avatarUrl : undefined;
 function Identity({ member }: { member: Member }) {
   const avatar = avatarFor(member);
+  // Many stored Drive links are dead or private; show initials instead of a broken image.
+  const [failedAvatar, setFailedAvatar] = useState("");
   const words = member.fullName.match(/\p{L}+/gu) || [];
   const initials = (words[0]?.charAt(0) || "") + (words.length > 1 ? words.at(-1)?.charAt(0) || "" : "");
   return <span className={styles.identity}><span className={styles.avatar} aria-hidden="true">
-    {avatar ? <Image src={avatar} alt="" width={35} height={35} unoptimized /> : initials?.toLocaleUpperCase("vi") || <WorkspaceIcon name="member" />}
+    {avatar && failedAvatar !== avatar
+      ? <Image src={avatar} alt="" width={35} height={35} unoptimized onError={() => setFailedAvatar(avatar)} />
+      : initials?.toLocaleUpperCase("vi") || <WorkspaceIcon name="member" />}
   </span><span><strong>{member.fullName || member.studentId}</strong><small>{member.studentId}</small></span></span>;
 }
 

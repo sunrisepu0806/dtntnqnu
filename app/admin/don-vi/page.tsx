@@ -13,47 +13,7 @@ export default function AdminDonViMenu() {
     catch { alert('Đăng xuất chưa thành công. Vui lòng thử lại.'); setLoggingOut(false); }
   };
 
-  // Đường dẫn đã được cấu hình khớp với các thư mục trong ảnh
-  // Lưu ý: Nếu 4 thư mục nằm trực tiếp trong app/admin/don-vi/ thì dùng /admin/don-vi/...
-  // Nếu nằm trong app/danh-sach-dang-ky/ thì chỉ cần sửa tiền tố tương ứng.
   const menuItems = [
-    {
-      title: 'ĐĂNG BÀI VIẾT HOẠT ĐỘNG',
-      desc: 'Soạn bài viết, chọn ảnh đại diện, thêm nhiều ảnh hoạt động, định dạng in đậm in nghiêng, đổi màu chữ và đồng bộ sang Web A.',
-      href: '/admin/don-vi/dangbaiviet',
-      tag: 'SOẠN THẢO & XUẤT BẢN',
-      iconBorder: 'border-slate-200 text-slate-800 bg-slate-50',
-      icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-        </svg>
-      ),
-    },
-    {
-      title: 'QUẢN LÝ ĐỊNH VỊ BẢN ĐỒ',
-      desc: 'Chọn bản đồ lấy tọa độ, dán liên kết Google Maps tự động bóc tách vị trí, tải ảnh chuyến đi và ghim điểm lên Bản đồ Nhật ký.',
-      href: '/admin/don-vi/dinhvi',
-      tag: 'BẢN ĐỒ DẤU ẤN',
-      iconBorder: 'border-emerald-200 text-emerald-600 bg-emerald-50',
-      icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-          <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-        </svg>
-      ),
-    },
-    {
-      title: 'TRA CỨU & ĐĂNG KÝ THÀNH VIÊN',
-      desc: 'Tra cứu thông tin chính xác theo mã số sinh viên, xem lịch sử điểm danh, cấp mã phản hồi nhanh cá nhân và đăng ký thành viên mới.',
-      href: '/admin/don-vi/quan-ly-bieu-mau',
-      tag: 'THÀNH VIÊN & ĐIỂM DANH',
-      iconBorder: 'border-amber-200 text-amber-600 bg-amber-50',
-      icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-        </svg>
-      ),
-    },
     {
       title: 'CẤP GIẤY CHỨNG NHẬN HOẠT ĐỘNG',
       desc: 'Quản lý thư mục giấy chứng nhận theo hoạt động và tra cứu theo mã số sinh viên.',
@@ -79,7 +39,7 @@ export default function AdminDonViMenu() {
             Công cụ đơn vị
           </h1>
           <p className="text-xs text-slate-500 font-medium mt-1">
-            Bài viết, bản đồ, đăng ký thành viên và giấy chứng nhận
+            Cấp và tra cứu giấy chứng nhận hoạt động
           </p>
         </div>
 
