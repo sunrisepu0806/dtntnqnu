@@ -6,6 +6,8 @@ export function useAttendanceDraft<T>(scope: string) {
   const key = useRef("");
   const [draft, setDraft] = useState<T | null>(null);
   const [storageError, setStorageError] = useState("");
+  // True once storage has been checked (with or without a draft), so callers can wait for it.
+  const [draftLoaded, setDraftLoaded] = useState(false);
   useEffect(() => {
     const controller = new AbortController();
     key.current = "";
@@ -20,7 +22,7 @@ export function useAttendanceDraft<T>(scope: string) {
         if (saved && saved.expires > Date.now()) setDraft(saved.value);
         else if (saved) localStorage.removeItem(key.current);
       } catch { setStorageError("Trình duyệt không lưu được bản nháp. Giữ trang mở đến khi gửi xong."); }
-    }).catch(() => {});
+    }).catch(() => {}).finally(() => { if (!controller.signal.aborted) setDraftLoaded(true); });
     return () => controller.abort();
   }, [scope]);
   const saveDraft = useCallback((value: T | null) => {
@@ -31,5 +33,5 @@ export function useAttendanceDraft<T>(scope: string) {
       setDraft(value); setStorageError("");
     } catch { setStorageError("Không lưu được bản nháp. Giữ trang mở đến khi gửi xong."); }
   }, []);
-  return { draft, saveDraft, storageError };
+  return { draft, draftLoaded, saveDraft, storageError };
 }

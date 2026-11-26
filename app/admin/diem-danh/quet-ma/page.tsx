@@ -16,7 +16,7 @@ const labels = { pending: "Chờ admin duyệt", queued: "Đang chờ", saving: 
 
 export default function TrangQuetDiemDanh() {
   const user = useAdminUser();
-  const {draft,saveDraft,storageError}=useAttendanceDraft<{activityId:string;sessionId:string;codes:string[]}>("scanner");
+  const {draft,draftLoaded,saveDraft,storageError}=useAttendanceDraft<{activityId:string;sessionId:string;codes:string[]}>("scanner");
   const [opening,setOpening]=useState(false);
   const [editingSelection,setEditingSelection]=useState(false);
   const startLock=useRef(false);
@@ -178,10 +178,15 @@ export default function TrangQuetDiemDanh() {
   const selectedSession = selectedActivity?.sessions.find(item => item.id === sessionId);
   const startOnArrival = useEffectEvent(() => { void start(); });
   useEffect(() => {
-    if (!autoStart.current || activity || !selectedSession) return;
-    autoStart.current = false;
-    startOnArrival();
-  }, [activity, selectedSession]);
+    // Arriving from "Tiếp tục điểm danh" with the activity and session already chosen:
+    // skip the second "Bắt đầu" click. Wait until the draft check has run.
+    if (!autoStart.current || activity || !selectedSession || !draftLoaded) return;
+    // Unsent codes from an earlier session: let the user restore or drop them first,
+    // otherwise the first scan here would overwrite that draft.
+    if (draft) { autoStart.current = false; return; }
+    const timer = setTimeout(() => { autoStart.current = false; startOnArrival(); }, 0);
+    return () => clearTimeout(timer);
+  }, [activity, selectedSession, draft, draftLoaded]);
   const button = "scanner-btn";
   const panel = "scanner-panel";
   return <div className="attendance-scanner space-y-5">

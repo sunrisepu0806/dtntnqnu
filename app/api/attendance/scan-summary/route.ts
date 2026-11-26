@@ -1,18 +1,32 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
-import { readSession } from "@/lib/server-session";
+import { readSession, readSessionClaims } from "@/lib/server-session";
 import { AttendanceError, documentId } from "@/lib/attendance-service";
+import { accessKey, createRecentAccess } from "@/lib/recent-access";
 
 import { validateScannerActivity } from "@/lib/scanner-activity";
 
+// The scan page polls this every 30 s. Re-checking the session (2 reads) and the
+// activity (1 read) every time is most of the cost, so a passed check is trusted for
+// 2 minutes per login session + activity + session + password. A revoked account or a
+// closed activity may therefore still see these read-only counts for up to 2 minutes;
+// logging out ends it at once (the cookie is gone). Check-ins always re-check live.
+const ACCESS_TTL_MS = 2 * 60 * 1000;
+const recentAccess = createRecentAccess(ACCESS_TTL_MS);
+
 export async function POST(request: Request) {
   try {
-    const session = await readSession();
-    if (!session) throw new AttendanceError("Vui lòng đăng nhập lại.", 401);
-    if (!["Quản trị viên","Quét mã"].includes(session.user.role)) throw new AttendanceError("Không có quyền quét mã.", 403);
+    const claims = await readSessionClaims();
     const body = await request.json();
     const id = documentId(body.sessionId);
-    await validateScannerActivity(body.activityId, id, body.password);
+    const key = claims ? accessKey(claims.sid, documentId(body.activityId), id, body.password) : "";
+    if (!key || !recentAccess.has(key)) {
+      const session = await readSession();
+      if (!session) throw new AttendanceError("Vui lòng đăng nhập lại.", 401);
+      if (!["Quản trị viên","Quét mã"].includes(session.user.role)) throw new AttendanceError("Không có quyền quét mã.", 403);
+      await validateScannerActivity(body.activityId, id, body.password);
+      if (key && claims && session.sid === claims.sid) recentAccess.add(key);
+    }
     const db = adminDb();
     const activity = db.collection("attendance").where("activityId", "==", documentId(body.activityId));
     const scope = id === "legacy" ? activity : activity.where("sessionId","==",id);
