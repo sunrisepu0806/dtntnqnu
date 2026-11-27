@@ -18,6 +18,9 @@ async function findMember(id: string) {
   }
 }
 
+const ACTIVITY_TTL_MS = 10 * 60 * 1000;
+const activityCache = new Map<string,{data:FirebaseFirestore.DocumentData | null;at:number}>();
+
 async function records(filter: {month:string} | {id:string;memberId:string}) {
   const db = adminDb();
   const activities = new Map<string,FirebaseFirestore.DocumentData>();
@@ -49,9 +52,18 @@ async function records(filter: {month:string} | {id:string;memberId:string}) {
   }));
   const entries = groups.flat();
   const ids = [...new Set(entries.map(({record}) => String(record.activityId || "")).filter(id => id && !id.includes("/") && !activities.has(id)))];
-  for (let i = 0; i < ids.length; i += 100) {
-    const refs = ids.slice(i,i+100).map(id => db.collection("activities").doc(id));
+  // Hoạt động hiếm khi đổi: dùng lại bản đã đọc trong 10 phút thay vì đọc lại mỗi lần tra cứu
+  const now = Date.now();
+  const missing: string[] = [];
+  for (const id of ids) {
+    const saved = activityCache.get(id);
+    if (saved && now - saved.at < ACTIVITY_TTL_MS) { if (saved.data) activities.set(id,saved.data); }
+    else missing.push(id);
+  }
+  for (let i = 0; i < missing.length; i += 100) {
+    const refs = missing.slice(i,i+100).map(id => db.collection("activities").doc(id));
     for (const doc of await db.getAll(...refs,{fieldMask:["points","name","date","sessions"]})) {
+      activityCache.set(doc.id,{data:doc.exists ? doc.data()! : null,at:now});
       if (doc.exists) activities.set(doc.id,doc.data()!);
     }
   }
@@ -67,6 +79,65 @@ async function records(filter: {month:string} | {id:string;memberId:string}) {
   return rows.sort((a,b)=>a.date.localeCompare(b.date));
 }
 
+const MEMBER_TTL_MS = 5 * 60 * 1000;
+const MEMBER_CACHE = "public, s-maxage=300, stale-while-revalidate=600";
+const memberCache = new Map<string,{body:unknown;at:number}>();
+
+type RankingRow ={member:{fullName:string;group:string};points:number;group:number;department:number};
+
+async function computeRanking(month: string): Promise<RankingRow[]> {
+  const totals = new Map<string,RankingRow>();
+  for(const r of await records({month})) {
+    if(!r.id) continue;
+    const row = totals.get(r.id) || {member:{fullName:r.fullName || "Thành viên",group:r.group},points:0,group:0,department:0};
+    row[r.type==="Hoạt động Đội" ? "group" : "department"] += r.units;
+    row.points += r.points;
+    totals.set(r.id,row);
+  }
+  return [...totals.values()].sort((a,b)=>b.points-a.points || a.member.fullName.localeCompare(b.member.fullName,"vi"));
+}
+
+// Tính BXH tháng phải đọc toàn bộ điểm danh của tháng (hàng nghìn lượt đọc mỗi lần).
+// Lưu kết quả vào một tài liệu duy nhất để các lần gọi sau chỉ tốn 1 lượt đọc,
+// và giữ thêm trong bộ nhớ của server để không tốn lượt đọc nào.
+const RANKING_TTL_MS = 15 * 60 * 1000; // tháng hiện tại: tính lại tối đa 15 phút/lần
+const PAST_RANKING_TTL_MS = 24 * 60 * 60 * 1000; // tháng đã qua: 1 ngày/lần
+const memoryRanking = new Map<string,{rows:RankingRow[];at:number}>();
+
+async function rankingRows(month: string): Promise<RankingRow[]> {
+  const currentMonth = new Date().toLocaleDateString("sv-SE",{timeZone:"Asia/Ho_Chi_Minh"}).slice(0,7);
+  const ttl = month < currentMonth ? PAST_RANKING_TTL_MS : RANKING_TTL_MS;
+  const now = Date.now();
+  const inMemory = memoryRanking.get(month);
+  if (inMemory && now - inMemory.at < ttl) return inMemory.rows;
+
+  const cacheRef = adminDb().collection("public_cache").doc(`ranking-${month}`);
+  let saved: {rows?:RankingRow[];computedAt?:number} | undefined;
+  try {
+    saved = (await cacheRef.get()).data() as typeof saved;
+  } catch (error) {
+    if (inMemory) return inMemory.rows;
+    throw error;
+  }
+  if (saved?.rows && typeof saved.computedAt === "number" && now - saved.computedAt < ttl) {
+    memoryRanking.set(month,{rows:saved.rows,at:saved.computedAt});
+    return saved.rows;
+  }
+
+  let rows: RankingRow[];
+  try {
+    rows = await computeRanking(month);
+  } catch (error) {
+    // Hết hạn mức hoặc lỗi tạm thời: trả bản cũ còn lưu thay vì báo lỗi
+    const stale = inMemory?.rows ?? saved?.rows;
+    if (stale) return stale;
+    throw error;
+  }
+  memoryRanking.set(month,{rows,at:now});
+  await cacheRef.set({rows,computedAt:now}).catch(() => undefined); // không lưu được thì lần sau tính lại
+  return rows;
+}
+
 export async function GET(request: Request) {
   const p = new URL(request.url).searchParams;
   if (p.has("view")) return new Response(null,{status:404});
@@ -75,27 +146,24 @@ export async function GET(request: Request) {
       const month = p.get("month") || "";
       if(!/^20\d{2}-(0[1-9]|1[0-2])$/.test(month)) return json({error:"Tháng không hợp lệ."},400);
       if (month < "2026-11") return json({error:"BXH bắt đầu từ tháng 11/2026."},410);
-      const totals = new Map<string,{member:{fullName:string;group:string};points:number;group:number;department:number}>();
-      for(const r of await records({month})) {
-        if(!r.id) continue;
-        const row = totals.get(r.id) || {member:{fullName:r.fullName || "Thành viên",group:r.group},points:0,group:0,department:0};
-        row[r.type==="Hoạt động Đội" ? "group" : "department"] += r.units;
-        row.points += r.points;
-        totals.set(r.id,row);
-      }
-      return json({rows:[...totals.values()].sort((a,b)=>b.points-a.points || a.member.fullName.localeCompare(b.member.fullName,"vi"))},200,"public, s-maxage=120");
+      return json({rows:await rankingRows(month)},200,"public, s-maxage=600, stale-while-revalidate=3600");
     }
     const id = (p.get("mssv") || "").trim();
     if(!/^[a-zA-Z0-9_-]{4,24}$/.test(id)) return json({error:"Mã số sinh viên không hợp lệ."},400);
+    // Cùng một MSSV tra lại (bấm lại, tải Excel) trong 5 phút thì dùng kết quả cũ, không đọc Firestore
+    const key = id.toLowerCase();
+    const remembered = memberCache.get(key);
+    if (remembered && Date.now() - remembered.at < MEMBER_TTL_MS) return json(remembered.body,200,MEMBER_CACHE);
+    const answer = (body: unknown) => { memberCache.set(key,{body,at:Date.now()}); if (memberCache.size > 500) memberCache.delete(memberCache.keys().next().value!); return json(body,200,MEMBER_CACHE); };
     const doc = await findMember(id);
     const d = doc?.data();
-    if(!doc || !d || d.archived) return json({member:null});
+    if(!doc || !d || d.archived) return answer({member:null});
     const studentId=String(d.mssv || d.studentId || d.msv || doc.id);
     const member={studentId,fullName:String(d.fullName||d.name||d.hoTen||""),group:String(d.to_id||d.group||d.to||"").replace(/\D/g,""),
       major:String(d.majorAndClass||d.major||d.nganhHoc||d.lop||""),department:String(d.mangChuyenMon||d.specialty||""),createdAt:typeof d.createdAt==="string"?d.createdAt:day(d.createdAt)};
     const history = (await records({id:studentId,memberId:doc.id})).map(({date,shift,name,type,units,points})=>({date,shift,name,type,units,points}));
     const sum=(type:string)=>history.filter(r=>r.type===type).reduce((n,r)=>n+r.units,0);
     const groupSessions=sum("Hoạt động Đội"), departmentSessions=sum("Công việc mảng");
-    return json({member:{...member,groupSessions,departmentSessions,totalSessions:groupSessions+departmentSessions,totalPoints:history.reduce((n,r)=>n+r.points,0)},records:history});
+    return answer({member:{...member,groupSessions,departmentSessions,totalSessions:groupSessions+departmentSessions,totalPoints:history.reduce((n,r)=>n+r.points,0)},records:history});
   } catch {return json({error:"Chưa tải được dữ liệu từ hệ thống điểm danh."},503);}
 }
